@@ -219,24 +219,19 @@ function WalkthroughControls({
 }) {
   const { camera, gl } = useThree();
 
-  const keys = useRef({
-    forward: false,
-    backward: false,
-    left: false,
-    right: false,
-  });
+  const pressedKeys = useRef(
+    new Set()
+  );
 
-  /* -------------------------------------------------------
+  /* =======================================================
      ENTER WALKTHROUGH
-  ------------------------------------------------------- */
+  ======================================================= */
 
   useEffect(() => {
     if (!active) return;
 
-    /*
-     * Resume saved position if available.
-     * Otherwise start at the default entrance.
-     */
+    pressedKeys.current.clear();
+
     if (savedCamera) {
       camera.position.copy(
         savedCamera.position
@@ -260,115 +255,56 @@ function WalkthroughControls({
     }
 
     camera.rotation.order = "YXZ";
-
-    /*
-     * IMPORTANT:
-     * Clear every movement key when entering.
-     */
-    keys.current.forward = false;
-    keys.current.backward = false;
-    keys.current.left = false;
-    keys.current.right = false;
   }, [
     active,
     camera,
     savedCamera,
   ]);
 
-  /* -------------------------------------------------------
+  /* =======================================================
      KEYBOARD
-  ------------------------------------------------------- */
+  ======================================================= */
 
   useEffect(() => {
     if (!active) return;
 
+    const movementKeys = new Set([
+      "KeyW",
+      "KeyA",
+      "KeyS",
+      "KeyD",
+      "ArrowUp",
+      "ArrowDown",
+      "ArrowLeft",
+      "ArrowRight",
+    ]);
+
     const handleKeyDown = (event) => {
-      /*
-       * Don't let browser scrolling or other
-       * keyboard behavior interfere.
-       */
       if (
-        [
-          "KeyW",
-          "KeyA",
-          "KeyS",
-          "KeyD",
-          "ArrowUp",
-          "ArrowDown",
-          "ArrowLeft",
-          "ArrowRight",
-        ].includes(event.code)
+        movementKeys.has(event.code)
       ) {
         event.preventDefault();
-      }
 
-      switch (event.code) {
-        case "KeyW":
-case "ArrowUp":
-  keys.current.backward = true;
-  break;
-
-case "KeyS":
-case "ArrowDown":
-  keys.current.forward = true;
-  break;
-
-        case "KeyA":
-        case "ArrowLeft":
-          keys.current.left = true;
-          break;
-
-        case "KeyD":
-        case "ArrowRight":
-          keys.current.right = true;
-          break;
-
-        default:
-          break;
+        pressedKeys.current.add(
+          event.code
+        );
       }
     };
 
     const handleKeyUp = (event) => {
-      switch (event.code) {
-        case "KeyW":
-        case "ArrowUp":
-          keys.current.forward = false;
-          break;
+      if (
+        movementKeys.has(event.code)
+      ) {
+        event.preventDefault();
 
-        case "KeyS":
-        case "ArrowDown":
-          /*
-           * THIS IS THE IMPORTANT FIX.
-           */
-          keys.current.backward = false;
-          break;
-
-        case "KeyA":
-        case "ArrowLeft":
-          keys.current.left = false;
-          break;
-
-        case "KeyD":
-        case "ArrowRight":
-          keys.current.right = false;
-          break;
-
-        default:
-          break;
+        pressedKeys.current.delete(
+          event.code
+        );
       }
     };
 
-    /*
-     * If browser/window loses focus while a key
-     * is pressed, reset everything.
-     *
-     * This prevents S/W/A/D getting stuck.
-     */
-    const clearKeys = () => {
-      keys.current.forward = false;
-      keys.current.backward = false;
-      keys.current.left = false;
-      keys.current.right = false;
+    const clearMovement = () => {
+      pressedKeys.current.clear();
     };
 
     window.addEventListener(
@@ -383,12 +319,12 @@ case "ArrowDown":
 
     window.addEventListener(
       "blur",
-      clearKeys
+      clearMovement
     );
 
     document.addEventListener(
       "visibilitychange",
-      clearKeys
+      clearMovement
     );
 
     return () => {
@@ -404,19 +340,21 @@ case "ArrowDown":
 
       window.removeEventListener(
         "blur",
-        clearKeys
+        clearMovement
       );
 
       document.removeEventListener(
         "visibilitychange",
-        clearKeys
+        clearMovement
       );
+
+      pressedKeys.current.clear();
     };
   }, [active]);
 
-  /* -------------------------------------------------------
+  /* =======================================================
      POINTER LOCK
-  ------------------------------------------------------- */
+  ======================================================= */
 
   useEffect(() => {
     if (!active) return;
@@ -440,9 +378,9 @@ case "ArrowDown":
     };
   }, [active, gl]);
 
-  /* -------------------------------------------------------
+  /* =======================================================
      MOUSE LOOK
-  ------------------------------------------------------- */
+  ======================================================= */
 
   useEffect(() => {
     if (!active) return;
@@ -495,91 +433,161 @@ case "ArrowDown":
     gl,
   ]);
 
-  /* -------------------------------------------------------
+  /* =======================================================
      MOVEMENT
-  ------------------------------------------------------- */
+  ======================================================= */
 
   useEffect(() => {
     if (!active) return;
 
     let animationFrame;
 
-    /*
-     * Reusable movement vector.
-     */
+    const forward =
+      new THREE.Vector3();
+
+    const right =
+      new THREE.Vector3();
+
     const movement =
       new THREE.Vector3();
+
+    const worldUp =
+      new THREE.Vector3(
+        0,
+        1,
+        0
+      );
 
     const move = () => {
       const speed = 0.06;
 
-      movement.set(0, 0, 0);
+      movement.set(
+        0,
+        0,
+        0
+      );
 
       /*
-       * Forward / backward.
+       * Get the direction the camera
+       * is currently facing.
        */
-      if (keys.current.forward) {
-        movement.z -= 1;
-      }
+      camera.getWorldDirection(
+        forward
+      );
 
-      if (keys.current.backward) {
-        movement.z += 1;
+      /*
+       * Walk only horizontally.
+       * Looking up/down must NOT make
+       * the player fly.
+       */
+      forward.y = 0;
+
+      if (
+        forward.lengthSq() > 0
+      ) {
+        forward.normalize();
       }
 
       /*
-       * Left / right.
+       * Calculate camera's right direction.
        */
-      if (keys.current.left) {
-        movement.x -= 1;
+      right.crossVectors(
+        forward,
+        worldUp
+      );
+
+      if (
+        right.lengthSq() > 0
+      ) {
+        right.normalize();
       }
 
-      if (keys.current.right) {
-        movement.x += 1;
+      /*
+       * W = forward
+       */
+      if (
+        pressedKeys.current.has(
+          "KeyW"
+        ) ||
+        pressedKeys.current.has(
+          "ArrowUp"
+        )
+      ) {
+        movement.add(
+          forward
+        );
       }
 
-      if (movement.lengthSq() > 0) {
+      /*
+       * S = backward
+       */
+      if (
+        pressedKeys.current.has(
+          "KeyS"
+        ) ||
+        pressedKeys.current.has(
+          "ArrowDown"
+        )
+      ) {
+        movement.sub(
+          forward
+        );
+      }
+
+      /*
+       * A = left
+       */
+      if (
+        pressedKeys.current.has(
+          "KeyA"
+        ) ||
+        pressedKeys.current.has(
+          "ArrowLeft"
+        )
+      ) {
+        movement.sub(
+          right
+        );
+      }
+
+      /*
+       * D = right
+       */
+      if (
+        pressedKeys.current.has(
+          "KeyD"
+        ) ||
+        pressedKeys.current.has(
+          "ArrowRight"
+        )
+      ) {
+        movement.add(
+          right
+        );
+      }
+
+      /*
+       * Move only if a key is actually
+       * being pressed.
+       */
+      if (
+        movement.lengthSq() > 0
+      ) {
         movement.normalize();
 
-        /*
-         * Use only horizontal camera direction.
-         *
-         * This prevents looking downward/upward
-         * from making the player fly or sink.
-         */
-        const yaw =
-          camera.rotation.y;
+        movement.multiplyScalar(
+          speed
+        );
 
-        const forwardX =
-          -Math.sin(yaw);
-
-        const forwardZ =
-          -Math.cos(yaw);
-
-        const rightX =
-          Math.cos(yaw);
-
-        const rightZ =
-          -Math.sin(yaw);
-
-        const moveX =
-          forwardX * movement.z +
-          rightX * movement.x;
-
-        const moveZ =
-          forwardZ * movement.z +
-          rightZ * movement.x;
-
-        camera.position.x +=
-          moveX * speed;
-
-        camera.position.z +=
-          moveZ * speed;
-
-        /*
-         * Fixed human eye height.
-         */
-        camera.position.y = 1.65;
+        camera.position.add(
+          movement
+        );
       }
+
+      /*
+       * Fixed eye height.
+       */
+      camera.position.y = 1.65;
 
       animationFrame =
         requestAnimationFrame(move);
@@ -591,15 +599,17 @@ case "ArrowDown":
       cancelAnimationFrame(
         animationFrame
       );
+
+      pressedKeys.current.clear();
     };
   }, [
     active,
     camera,
   ]);
 
-  /* -------------------------------------------------------
+  /* =======================================================
      SAVE CAMERA
-  ------------------------------------------------------- */
+  ======================================================= */
 
   useEffect(() => {
     if (!active) return;
@@ -646,7 +656,6 @@ case "ArrowDown":
 
   return null;
 }
-
 /* =========================================================
    LIGHTING PANEL
 ========================================================= */
