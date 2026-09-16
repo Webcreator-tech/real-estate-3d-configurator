@@ -22,11 +22,20 @@ function Flat() {
     model.position.y -= box.min.y;
 
     model.traverse((object) => {
-      if (object.isMesh) {
-        object.castShadow = true;
-        object.receiveShadow = true;
-      }
-    });
+  if (object.isMesh) {
+    object.castShadow = true;
+    object.receiveShadow = true;
+
+    if (object.material?.name === "Window_Glass") {
+      object.material = object.material.clone();
+
+      object.material.transparent = true;
+      object.material.opacity = 0.12;
+      object.material.depthWrite = false;
+      object.material.side = THREE.DoubleSide;
+    }
+  }
+});
   }, [model]);
 
   return <primitive object={model} />;
