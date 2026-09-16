@@ -6,6 +6,7 @@ import {
 } from "@react-three/drei";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import "./App.css";
 
 function Flat() {
   const { scene } = useGLTF("/models/flat.glb");
