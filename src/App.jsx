@@ -3,7 +3,6 @@ import {
   OrbitControls,
   Environment,
   useGLTF,
-  PointerLockControls,
 } from "@react-three/drei";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -16,11 +15,16 @@ import "./App.css";
 function Flat() {
   const { scene } = useGLTF("/models/flat.glb");
 
-  const model = useMemo(() => scene.clone(true), [scene]);
+  const model = useMemo(
+    () => scene.clone(true),
+    [scene]
+  );
 
   useEffect(() => {
     const box = new THREE.Box3().setFromObject(model);
-    const center = box.getCenter(new THREE.Vector3());
+    const center = box.getCenter(
+      new THREE.Vector3()
+    );
 
     model.position.x -= center.x;
     model.position.z -= center.z;
@@ -31,24 +35,27 @@ function Flat() {
         object.castShadow = true;
         object.receiveShadow = true;
 
-        /*
-         * Window glass
-         */
+        /* Window glass */
         if (
           object.material &&
           object.material.name === "Window_Glass"
         ) {
-          object.material = object.material.clone();
+          object.material =
+            object.material.clone();
+
           object.material.transparent = true;
           object.material.opacity = 0.12;
           object.material.depthWrite = false;
-          object.material.side = THREE.DoubleSide;
+          object.material.side =
+            THREE.DoubleSide;
         }
       }
     });
   }, [model]);
 
-  return <primitive object={model} />;
+  return (
+    <primitive object={model} />
+  );
 }
 
 /* =========================================================
@@ -79,7 +86,8 @@ function SunLight({ sunValue }) {
   const sunZ = Math.sin(angle) * 14;
   const sunY = 5 + Math.sin(angle) * 13;
 
-  const intensity = 1.6 + Math.sin(angle) * 1.6;
+  const intensity =
+    1.6 + Math.sin(angle) * 1.6;
 
   const sunColor =
     sunValue < 0.34
@@ -111,15 +119,54 @@ function SunLight({ sunValue }) {
    ORBIT MODE
 ========================================================= */
 
-function CameraSetup({ walkthrough }) {
+function CameraSetup({
+  walkthrough,
+  savedCamera,
+}) {
   const { camera } = useThree();
   const controlsRef = useRef();
 
   useEffect(() => {
     if (walkthrough) return;
 
-    camera.position.set(10, 8, 10);
-    camera.lookAt(0, 1.5, 0);
+    /*
+     * If we have a saved walkthrough camera,
+     * resume from that exact location.
+     */
+    if (savedCamera) {
+      camera.position.copy(
+        savedCamera.position
+      );
+
+      camera.rotation.copy(
+        savedCamera.rotation
+      );
+
+      if (controlsRef.current) {
+        controlsRef.current.target.copy(
+          savedCamera.target
+        );
+
+        controlsRef.current.update();
+      }
+
+      return;
+    }
+
+    /*
+     * Initial exterior camera.
+     */
+    camera.position.set(
+      10,
+      8,
+      10
+    );
+
+    camera.lookAt(
+      0,
+      1.5,
+      0
+    );
 
     if (controlsRef.current) {
       controlsRef.current.target.set(
@@ -130,7 +177,11 @@ function CameraSetup({ walkthrough }) {
 
       controlsRef.current.update();
     }
-  }, [camera, walkthrough]);
+  }, [
+    camera,
+    walkthrough,
+    savedCamera,
+  ]);
 
   if (walkthrough) return null;
 
@@ -149,7 +200,9 @@ function CameraSetup({ walkthrough }) {
       minDistance={1.5}
       maxDistance={30}
       minPolarAngle={0.01}
-      maxPolarAngle={Math.PI - 0.05}
+      maxPolarAngle={
+        Math.PI - 0.05
+      }
       touches={{
         ONE: THREE.TOUCH.ROTATE,
         TWO: THREE.TOUCH.DOLLY_PAN,
@@ -162,10 +215,13 @@ function CameraSetup({ walkthrough }) {
    WALKTHROUGH MODE
 ========================================================= */
 
-function WalkthroughControls({ active }) {
+function WalkthroughControls({
+  active,
+  savedCamera,
+  onCameraSave,
+}) {
   const { camera, gl } = useThree();
 
-  const controlsRef = useRef();
   const keys = useRef({
     forward: false,
     backward: false,
@@ -173,14 +229,60 @@ function WalkthroughControls({ active }) {
     right: false,
   });
 
-  const velocity = useRef(
-    new THREE.Vector3()
-  );
+  /* -----------------------------------------
+     Enter walkthrough
+  ----------------------------------------- */
 
   useEffect(() => {
     if (!active) return;
 
-    camera.position.set(0, 1.65, 4);
+    /*
+     * IMPORTANT:
+     * If returning from Orbit mode using a saved
+     * walkthrough position, use that position.
+     *
+     * Otherwise use a default interior position.
+     */
+    if (savedCamera) {
+      camera.position.copy(
+        savedCamera.position
+      );
+
+      camera.rotation.copy(
+        savedCamera.rotation
+      );
+    } else {
+      camera.position.set(
+        0,
+        1.65,
+        4
+      );
+
+      camera.rotation.set(
+        0,
+        0,
+        0
+      );
+    }
+
+    camera.rotation.order = "YXZ";
+
+    keys.current.forward = false;
+    keys.current.backward = false;
+    keys.current.left = false;
+    keys.current.right = false;
+  }, [
+    active,
+    camera,
+    savedCamera,
+  ]);
+
+  /* -----------------------------------------
+     Keyboard movement
+  ----------------------------------------- */
+
+  useEffect(() => {
+    if (!active) return;
 
     const handleKeyDown = (event) => {
       switch (event.code) {
@@ -218,7 +320,7 @@ function WalkthroughControls({ active }) {
 
         case "KeyS":
         case "ArrowDown":
-          keys.current.backward = false;
+          keys.current.backward = true;
           break;
 
         case "KeyA":
@@ -257,7 +359,11 @@ function WalkthroughControls({ active }) {
         handleKeyUp
       );
     };
-  }, [active, camera]);
+  }, [active]);
+
+  /* -----------------------------------------
+     Pointer lock
+  ----------------------------------------- */
 
   useEffect(() => {
     if (!active) return;
@@ -265,9 +371,7 @@ function WalkthroughControls({ active }) {
     const element = gl.domElement;
 
     const handleClick = () => {
-      if (document.pointerLockElement !== element) {
-        element.requestPointerLock?.();
-      }
+      element.requestPointerLock?.();
     };
 
     element.addEventListener(
@@ -282,6 +386,10 @@ function WalkthroughControls({ active }) {
       );
     };
   }, [active, gl]);
+
+  /* -----------------------------------------
+     Mouse look
+  ----------------------------------------- */
 
   useEffect(() => {
     if (!active) return;
@@ -299,18 +407,22 @@ function WalkthroughControls({ active }) {
       camera.rotation.order = "YXZ";
 
       camera.rotation.y -=
-        event.movementX * sensitivity;
+        event.movementX *
+        sensitivity;
 
       camera.rotation.x -=
-        event.movementY * sensitivity;
+        event.movementY *
+        sensitivity;
 
-      const maxPitch = Math.PI / 2 - 0.05;
+      const maxPitch =
+        Math.PI / 2 - 0.05;
 
-      camera.rotation.x = THREE.MathUtils.clamp(
-        camera.rotation.x,
-        -maxPitch,
-        maxPitch
-      );
+      camera.rotation.x =
+        THREE.MathUtils.clamp(
+          camera.rotation.x,
+          -maxPitch,
+          maxPitch
+        );
     };
 
     window.addEventListener(
@@ -326,6 +438,10 @@ function WalkthroughControls({ active }) {
     };
   }, [active, camera, gl]);
 
+  /* -----------------------------------------
+     Movement loop
+  ----------------------------------------- */
+
   useEffect(() => {
     if (!active) return;
 
@@ -334,45 +450,51 @@ function WalkthroughControls({ active }) {
     const move = () => {
       const speed = 0.06;
 
-      velocity.current.set(0, 0, 0);
+      const movement =
+        new THREE.Vector3();
 
       if (keys.current.forward) {
-        velocity.current.z -= speed;
+        movement.z -= 1;
       }
 
       if (keys.current.backward) {
-        velocity.current.z += speed;
+        movement.z += 1;
       }
 
       if (keys.current.left) {
-        velocity.current.x -= speed;
+        movement.x -= 1;
       }
 
       if (keys.current.right) {
-        velocity.current.x += speed;
+        movement.x += 1;
       }
 
-      if (velocity.current.length() > 0) {
-        velocity.current.normalize();
-        velocity.current.multiplyScalar(speed);
+      if (movement.length() > 0) {
+        movement.normalize();
 
-        const direction =
-          new THREE.Vector3(
-            velocity.current.x,
-            0,
-            velocity.current.z
-          );
+        movement.multiplyScalar(
+          speed
+        );
 
-        direction.applyQuaternion(
+        /*
+         * Move relative to where
+         * the player is looking.
+         */
+        movement.applyQuaternion(
           camera.quaternion
         );
 
-        direction.y = 0;
+        /*
+         * No flying.
+         */
+        movement.y = 0;
 
-        camera.position.add(direction);
+        camera.position.add(
+          movement
+        );
 
         /*
-         * Keep player's head at floor level.
+         * Fixed eye height.
          */
         camera.position.y = 1.65;
       }
@@ -384,9 +506,58 @@ function WalkthroughControls({ active }) {
     move();
 
     return () => {
-      cancelAnimationFrame(animationFrame);
+      cancelAnimationFrame(
+        animationFrame
+      );
     };
   }, [active, camera]);
+
+  /* -----------------------------------------
+     Save current camera
+  ----------------------------------------- */
+
+  useEffect(() => {
+    if (!active) return;
+
+    const saveCurrentCamera =
+      () => {
+        onCameraSave({
+          position:
+            camera.position.clone(),
+
+          rotation:
+            camera.rotation.clone(),
+
+          /*
+           * Orbit target slightly in
+           * front of the player.
+           */
+          target:
+            camera.position
+              .clone()
+              .add(
+                new THREE.Vector3(
+                  0,
+                  0,
+                  -1
+                ).applyQuaternion(
+                  camera.quaternion
+                )
+              ),
+        });
+      };
+
+    window.__saveWalkthroughCamera =
+      saveCurrentCamera;
+
+    return () => {
+      delete window.__saveWalkthroughCamera;
+    };
+  }, [
+    active,
+    camera,
+    onCameraSave,
+  ]);
 
   return null;
 }
@@ -445,7 +616,9 @@ function LightingPanel({
       </div>
 
       <div className="sun-presets">
-        {Object.entries(SUN_PRESETS).map(
+        {Object.entries(
+          SUN_PRESETS
+        ).map(
           ([key, preset]) => (
             <button
               type="button"
@@ -456,7 +629,9 @@ function LightingPanel({
                   : ""
               }`}
               onClick={() =>
-                setSunValue(preset.value)
+                setSunValue(
+                  preset.value
+                )
               }
             >
               <span className="preset-icon">
@@ -480,15 +655,20 @@ function LightingPanel({
         className="advanced-toggle"
         onClick={() =>
           setAdvancedOpen(
-            (previous) => !previous
+            (previous) =>
+              !previous
           )
         }
       >
-        <span>Advanced</span>
+        <span>
+          Advanced
+        </span>
 
         <span
           className={`advanced-arrow ${
-            advancedOpen ? "open" : ""
+            advancedOpen
+              ? "open"
+              : ""
           }`}
         >
           ›
@@ -518,16 +698,26 @@ function LightingPanel({
             value={sunValue}
             onChange={(event) =>
               setSunValue(
-                Number(event.target.value)
+                Number(
+                  event.target.value
+                )
               )
             }
             className="sun-slider"
           />
 
           <div className="trajectory-labels">
-            <span>Morning</span>
-            <span>Midday</span>
-            <span>Evening</span>
+            <span>
+              Morning
+            </span>
+
+            <span>
+              Midday
+            </span>
+
+            <span>
+              Evening
+            </span>
           </div>
         </div>
       )}
@@ -539,7 +729,9 @@ function LightingPanel({
    WALKTHROUGH UI
 ========================================================= */
 
-function WalkthroughHelp({ onExit }) {
+function WalkthroughHelp({
+  onExit,
+}) {
   return (
     <div className="walkthrough-help">
       <div className="walkthrough-title">
@@ -555,7 +747,10 @@ function WalkthroughHelp({ onExit }) {
         <span>A</span>
         <span>S</span>
         <span>D</span>
-        <small>Move</small>
+
+        <small>
+          Move
+        </small>
       </div>
 
       <button
@@ -583,12 +778,34 @@ export default function App() {
   const [walkthrough, setWalkthrough] =
     useState(false);
 
+  const [savedCamera, setSavedCamera] =
+    useState(null);
+
+  const handleExitWalkthrough =
+    () => {
+      /*
+       * Save exact current position
+       * before switching to Orbit.
+       */
+      if (
+        window.__saveWalkthroughCamera
+      ) {
+        window.__saveWalkthroughCamera();
+      }
+
+      setWalkthrough(false);
+    };
+
   return (
     <div className="app">
       <Canvas
         shadows
         camera={{
-          position: [10, 8, 10],
+          position: [
+            10,
+            8,
+            10,
+          ],
           fov: 45,
           near: 0.1,
           far: 100,
@@ -596,10 +813,14 @@ export default function App() {
       >
         <color
           attach="background"
-          args={["#dfe3e6"]}
+          args={[
+            "#dfe3e6",
+          ]}
         />
 
-        <ambientLight intensity={0.45} />
+        <ambientLight
+          intensity={0.45}
+        />
 
         <SunLight
           sunValue={sunValue}
@@ -613,15 +834,30 @@ export default function App() {
         <Flat />
 
         <CameraSetup
-          walkthrough={walkthrough}
+          walkthrough={
+            walkthrough
+          }
+          savedCamera={
+            savedCamera
+          }
         />
 
         <WalkthroughControls
-          active={walkthrough}
+          active={
+            walkthrough
+          }
+          savedCamera={
+            savedCamera
+          }
+          onCameraSave={
+            setSavedCamera
+          }
         />
       </Canvas>
 
-      {/* WALKTHROUGH BUTTON */}
+      {/* =================================================
+          WALKTHROUGH BUTTON
+      ================================================= */}
 
       {!walkthrough && (
         <button
@@ -635,19 +871,24 @@ export default function App() {
         </button>
       )}
 
-      {/* WALKTHROUGH HELP */}
+      {/* =================================================
+          WALKTHROUGH HELP
+      ================================================= */}
 
       {walkthrough && (
         <WalkthroughHelp
-          onExit={() =>
-            setWalkthrough(false)
+          onExit={
+            handleExitWalkthrough
           }
         />
       )}
 
-      {/* LIGHTING BUTTON */}
+      {/* =================================================
+          LIGHTING BUTTON
+          ALWAYS AVAILABLE
+      ================================================= */}
 
-      {!walkthrough && !lightingOpen && (
+      {!lightingOpen && (
         <button
           type="button"
           className="lighting-main-button"
@@ -659,18 +900,27 @@ export default function App() {
             ☀️
           </span>
 
-          <span>Lighting</span>
+          <span>
+            Lighting
+          </span>
         </button>
       )}
 
-      {/* LIGHTING PANEL */}
+      {/* =================================================
+          LIGHTING PANEL
+          ALSO AVAILABLE IN WALKTHROUGH
+      ================================================= */}
 
-      {lightingOpen && !walkthrough && (
+      {lightingOpen && (
         <LightingPanel
           sunValue={sunValue}
-          setSunValue={setSunValue}
+          setSunValue={
+            setSunValue
+          }
           onClose={() =>
-            setLightingOpen(false)
+            setLightingOpen(
+              false
+            )
           }
         />
       )}
@@ -678,4 +928,6 @@ export default function App() {
   );
 }
 
-useGLTF.preload("/models/flat.glb");
+useGLTF.preload(
+  "/models/flat.glb"
+);
