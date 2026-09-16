@@ -304,14 +304,14 @@ function WalkthroughControls({
 
       switch (event.code) {
         case "KeyW":
-        case "ArrowUp":
-          keys.current.forward = true;
-          break;
+case "ArrowUp":
+  keys.current.backward = true;
+  break;
 
-        case "KeyS":
-        case "ArrowDown":
-          keys.current.backward = true;
-          break;
+case "KeyS":
+case "ArrowDown":
+  keys.current.forward = true;
+  break;
 
         case "KeyA":
         case "ArrowLeft":
