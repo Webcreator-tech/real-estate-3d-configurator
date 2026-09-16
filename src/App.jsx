@@ -47,15 +47,32 @@ function CameraSetup() {
 
   return (
     <OrbitControls
-      ref={controlsRef}
-      makeDefault
-      enableDamping
-      dampingFactor={0.08}
-      enablePan
-      enableZoom
-      minDistance={2}
-      maxDistance={30}
-    />
+  ref={controlsRef}
+  makeDefault
+
+  enableDamping
+  dampingFactor={0.08}
+
+  enableRotate
+  rotateSpeed={0.6}
+
+  enableZoom
+  zoomSpeed={0.8}
+
+  enablePan
+  panSpeed={0.8}
+
+  minDistance={2}
+  maxDistance={30}
+
+  minPolarAngle={0.01}
+  maxPolarAngle={Math.PI - 0.05}
+
+  touches={{
+    ONE: THREE.TOUCH.ROTATE,
+    TWO: THREE.TOUCH.DOLLY_PAN,
+  }}
+/>
   );
 }
 
