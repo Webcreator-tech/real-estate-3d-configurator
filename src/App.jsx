@@ -3,10 +3,15 @@ import {
   OrbitControls,
   Environment,
   useGLTF,
+  PointerLockControls,
 } from "@react-three/drei";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import "./App.css";
+
+/* =========================================================
+   HOUSE
+========================================================= */
 
 function Flat() {
   const { scene } = useGLTF("/models/flat.glb");
@@ -22,65 +27,32 @@ function Flat() {
     model.position.y -= box.min.y;
 
     model.traverse((object) => {
-  if (object.isMesh) {
-    object.castShadow = true;
-    object.receiveShadow = true;
+      if (object.isMesh) {
+        object.castShadow = true;
+        object.receiveShadow = true;
 
-    if (object.material?.name === "Window_Glass") {
-      object.material = object.material.clone();
-
-      object.material.transparent = true;
-      object.material.opacity = 0.12;
-      object.material.depthWrite = false;
-      object.material.side = THREE.DoubleSide;
-    }
-  }
-});
+        /*
+         * Window glass
+         */
+        if (
+          object.material &&
+          object.material.name === "Window_Glass"
+        ) {
+          object.material = object.material.clone();
+          object.material.transparent = true;
+          object.material.opacity = 0.12;
+          object.material.depthWrite = false;
+          object.material.side = THREE.DoubleSide;
+        }
+      }
+    });
   }, [model]);
 
   return <primitive object={model} />;
 }
 
-function CameraSetup() {
-  const { camera } = useThree();
-  const controlsRef = useRef();
-
-  useEffect(() => {
-    camera.position.set(10, 8, 10);
-    camera.lookAt(0, 1.5, 0);
-
-    if (controlsRef.current) {
-      controlsRef.current.target.set(0, 1.5, 0);
-      controlsRef.current.update();
-    }
-  }, [camera]);
-
-  return (
-    <OrbitControls
-      ref={controlsRef}
-      makeDefault
-      enableDamping
-      dampingFactor={0.08}
-      enablePan
-      enableZoom
-      enableRotate
-      rotateSpeed={0.6}
-      zoomSpeed={0.8}
-      panSpeed={0.8}
-      minDistance={2}
-      maxDistance={30}
-      minPolarAngle={0.01}
-      maxPolarAngle={Math.PI - 0.05}
-      touches={{
-        ONE: THREE.TOUCH.ROTATE,
-        TWO: THREE.TOUCH.DOLLY_PAN,
-      }}
-    />
-  );
-}
-
 /* =========================================================
-   SUN SYSTEM
+   SUN
 ========================================================= */
 
 const SUN_PRESETS = {
@@ -101,36 +73,25 @@ const SUN_PRESETS = {
 };
 
 function SunLight({ sunValue }) {
-  const sunRef = useRef();
-
-  /*
-   * Fixed curved trajectory.
-   *
-   * value 0 = sunrise side
-   * value 0.5 = highest point
-   * value 1 = sunset side
-   */
   const angle = sunValue * Math.PI;
 
   const sunX = Math.cos(angle) * 14;
   const sunZ = Math.sin(angle) * 14;
-
-  /*
-   * Higher in the sky around the middle
-   * and lower near morning/evening.
-   */
   const sunY = 5 + Math.sin(angle) * 13;
 
-  /*
-   * Slight intensity variation across the day.
-   */
-  const intensity =
-    1.4 + Math.sin(angle) * 1.1;
+  const intensity = 1.6 + Math.sin(angle) * 1.6;
+
+  const sunColor =
+    sunValue < 0.34
+      ? "#ffd7a0"
+      : sunValue < 0.67
+      ? "#fff3d0"
+      : "#ffb06a";
 
   return (
     <directionalLight
-      ref={sunRef}
       position={[sunX, sunY, sunZ]}
+      color={sunColor}
       intensity={intensity}
       castShadow
       shadow-mapSize-width={1024}
@@ -144,6 +105,290 @@ function SunLight({ sunValue }) {
       shadow-bias={-0.0001}
     />
   );
+}
+
+/* =========================================================
+   ORBIT MODE
+========================================================= */
+
+function CameraSetup({ walkthrough }) {
+  const { camera } = useThree();
+  const controlsRef = useRef();
+
+  useEffect(() => {
+    if (walkthrough) return;
+
+    camera.position.set(10, 8, 10);
+    camera.lookAt(0, 1.5, 0);
+
+    if (controlsRef.current) {
+      controlsRef.current.target.set(
+        0,
+        1.5,
+        0
+      );
+
+      controlsRef.current.update();
+    }
+  }, [camera, walkthrough]);
+
+  if (walkthrough) return null;
+
+  return (
+    <OrbitControls
+      ref={controlsRef}
+      makeDefault
+      enableDamping
+      dampingFactor={0.08}
+      enablePan
+      enableZoom
+      enableRotate
+      rotateSpeed={0.6}
+      zoomSpeed={0.8}
+      panSpeed={0.8}
+      minDistance={1.5}
+      maxDistance={30}
+      minPolarAngle={0.01}
+      maxPolarAngle={Math.PI - 0.05}
+      touches={{
+        ONE: THREE.TOUCH.ROTATE,
+        TWO: THREE.TOUCH.DOLLY_PAN,
+      }}
+    />
+  );
+}
+
+/* =========================================================
+   WALKTHROUGH MODE
+========================================================= */
+
+function WalkthroughControls({ active }) {
+  const { camera, gl } = useThree();
+
+  const controlsRef = useRef();
+  const keys = useRef({
+    forward: false,
+    backward: false,
+    left: false,
+    right: false,
+  });
+
+  const velocity = useRef(
+    new THREE.Vector3()
+  );
+
+  useEffect(() => {
+    if (!active) return;
+
+    camera.position.set(0, 1.65, 4);
+
+    const handleKeyDown = (event) => {
+      switch (event.code) {
+        case "KeyW":
+        case "ArrowUp":
+          keys.current.forward = true;
+          break;
+
+        case "KeyS":
+        case "ArrowDown":
+          keys.current.backward = true;
+          break;
+
+        case "KeyA":
+        case "ArrowLeft":
+          keys.current.left = true;
+          break;
+
+        case "KeyD":
+        case "ArrowRight":
+          keys.current.right = true;
+          break;
+
+        default:
+          break;
+      }
+    };
+
+    const handleKeyUp = (event) => {
+      switch (event.code) {
+        case "KeyW":
+        case "ArrowUp":
+          keys.current.forward = false;
+          break;
+
+        case "KeyS":
+        case "ArrowDown":
+          keys.current.backward = false;
+          break;
+
+        case "KeyA":
+        case "ArrowLeft":
+          keys.current.left = false;
+          break;
+
+        case "KeyD":
+        case "ArrowRight":
+          keys.current.right = false;
+          break;
+
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener(
+      "keydown",
+      handleKeyDown
+    );
+
+    window.addEventListener(
+      "keyup",
+      handleKeyUp
+    );
+
+    return () => {
+      window.removeEventListener(
+        "keydown",
+        handleKeyDown
+      );
+
+      window.removeEventListener(
+        "keyup",
+        handleKeyUp
+      );
+    };
+  }, [active, camera]);
+
+  useEffect(() => {
+    if (!active) return;
+
+    const element = gl.domElement;
+
+    const handleClick = () => {
+      if (document.pointerLockElement !== element) {
+        element.requestPointerLock?.();
+      }
+    };
+
+    element.addEventListener(
+      "click",
+      handleClick
+    );
+
+    return () => {
+      element.removeEventListener(
+        "click",
+        handleClick
+      );
+    };
+  }, [active, gl]);
+
+  useEffect(() => {
+    if (!active) return;
+
+    const handleMouseMove = (event) => {
+      if (
+        document.pointerLockElement !==
+        gl.domElement
+      ) {
+        return;
+      }
+
+      const sensitivity = 0.0025;
+
+      camera.rotation.order = "YXZ";
+
+      camera.rotation.y -=
+        event.movementX * sensitivity;
+
+      camera.rotation.x -=
+        event.movementY * sensitivity;
+
+      const maxPitch = Math.PI / 2 - 0.05;
+
+      camera.rotation.x = THREE.MathUtils.clamp(
+        camera.rotation.x,
+        -maxPitch,
+        maxPitch
+      );
+    };
+
+    window.addEventListener(
+      "mousemove",
+      handleMouseMove
+    );
+
+    return () => {
+      window.removeEventListener(
+        "mousemove",
+        handleMouseMove
+      );
+    };
+  }, [active, camera, gl]);
+
+  useEffect(() => {
+    if (!active) return;
+
+    let animationFrame;
+
+    const move = () => {
+      const speed = 0.06;
+
+      velocity.current.set(0, 0, 0);
+
+      if (keys.current.forward) {
+        velocity.current.z -= speed;
+      }
+
+      if (keys.current.backward) {
+        velocity.current.z += speed;
+      }
+
+      if (keys.current.left) {
+        velocity.current.x -= speed;
+      }
+
+      if (keys.current.right) {
+        velocity.current.x += speed;
+      }
+
+      if (velocity.current.length() > 0) {
+        velocity.current.normalize();
+        velocity.current.multiplyScalar(speed);
+
+        const direction =
+          new THREE.Vector3(
+            velocity.current.x,
+            0,
+            velocity.current.z
+          );
+
+        direction.applyQuaternion(
+          camera.quaternion
+        );
+
+        direction.y = 0;
+
+        camera.position.add(direction);
+
+        /*
+         * Keep player's head at floor level.
+         */
+        camera.position.y = 1.65;
+      }
+
+      animationFrame =
+        requestAnimationFrame(move);
+    };
+
+    move();
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+    };
+  }, [active, camera]);
+
+  return null;
 }
 
 /* =========================================================
@@ -164,12 +409,6 @@ function LightingPanel({
       : sunValue < 0.67
       ? "afternoon"
       : "evening";
-
-  const handlePreset = (preset) => {
-    setSunValue(
-      SUN_PRESETS[preset].value
-    );
-  };
 
   return (
     <div
@@ -217,7 +456,7 @@ function LightingPanel({
                   : ""
               }`}
               onClick={() =>
-                handlePreset(key)
+                setSunValue(preset.value)
               }
             >
               <span className="preset-icon">
@@ -245,9 +484,7 @@ function LightingPanel({
           )
         }
       >
-        <span>
-          Advanced
-        </span>
+        <span>Advanced</span>
 
         <span
           className={`advanced-arrow ${
@@ -285,7 +522,6 @@ function LightingPanel({
               )
             }
             className="sun-slider"
-            aria-label="Custom sun position"
           />
 
           <div className="trajectory-labels">
@@ -293,13 +529,42 @@ function LightingPanel({
             <span>Midday</span>
             <span>Evening</span>
           </div>
-
-          <div className="lighting-note">
-            Sun moves along a fixed natural
-            trajectory.
-          </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* =========================================================
+   WALKTHROUGH UI
+========================================================= */
+
+function WalkthroughHelp({ onExit }) {
+  return (
+    <div className="walkthrough-help">
+      <div className="walkthrough-title">
+        Walkthrough Mode
+      </div>
+
+      <div className="walkthrough-text">
+        Click to look around
+      </div>
+
+      <div className="walkthrough-keys">
+        <span>W</span>
+        <span>A</span>
+        <span>S</span>
+        <span>D</span>
+        <small>Move</small>
+      </div>
+
+      <button
+        type="button"
+        onClick={onExit}
+        className="walkthrough-exit"
+      >
+        Exit Walkthrough
+      </button>
     </div>
   );
 }
@@ -313,6 +578,9 @@ export default function App() {
     useState(0.5);
 
   const [lightingOpen, setLightingOpen] =
+    useState(false);
+
+  const [walkthrough, setWalkthrough] =
     useState(false);
 
   return (
@@ -331,24 +599,55 @@ export default function App() {
           args={["#dfe3e6"]}
         />
 
-        <ambientLight intensity={0.65} />
+        <ambientLight intensity={0.45} />
 
         <SunLight
           sunValue={sunValue}
         />
 
-        <Environment preset="city" />
+        <Environment
+          preset="city"
+          environmentIntensity={0.4}
+        />
 
         <Flat />
 
-        <CameraSetup />
+        <CameraSetup
+          walkthrough={walkthrough}
+        />
+
+        <WalkthroughControls
+          active={walkthrough}
+        />
       </Canvas>
 
-      {/* =================================================
-          LIGHTING BUTTON
-      ================================================= */}
+      {/* WALKTHROUGH BUTTON */}
 
-      {!lightingOpen && (
+      {!walkthrough && (
+        <button
+          type="button"
+          className="walkthrough-button"
+          onClick={() =>
+            setWalkthrough(true)
+          }
+        >
+          Walkthrough
+        </button>
+      )}
+
+      {/* WALKTHROUGH HELP */}
+
+      {walkthrough && (
+        <WalkthroughHelp
+          onExit={() =>
+            setWalkthrough(false)
+          }
+        />
+      )}
+
+      {/* LIGHTING BUTTON */}
+
+      {!walkthrough && !lightingOpen && (
         <button
           type="button"
           className="lighting-main-button"
@@ -364,11 +663,9 @@ export default function App() {
         </button>
       )}
 
-      {/* =================================================
-          LIGHTING PANEL
-      ================================================= */}
+      {/* LIGHTING PANEL */}
 
-      {lightingOpen && (
+      {lightingOpen && !walkthrough && (
         <LightingPanel
           sunValue={sunValue}
           setSunValue={setSunValue}
