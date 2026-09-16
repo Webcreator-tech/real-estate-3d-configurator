@@ -358,3 +358,127 @@ button {
     min-height: 62px;
   }
 }
+
+/* =========================================================
+   WALKTHROUGH
+========================================================= */
+
+.walkthrough-button {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+
+  min-height: 46px;
+  padding: 0 16px;
+
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 14px;
+
+  background: rgba(255, 255, 255, 0.92);
+  color: #1f2937;
+
+  font-size: 14px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.12);
+
+  backdrop-filter: blur(12px);
+}
+
+.walkthrough-help {
+  position: absolute;
+  left: 20px;
+  top: 20px;
+
+  width: 210px;
+  padding: 15px;
+
+  border-radius: 15px;
+
+  background: rgba(255, 255, 255, 0.94);
+  color: #1f2937;
+
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.14);
+
+  backdrop-filter: blur(14px);
+}
+
+.walkthrough-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.walkthrough-text {
+  margin-top: 4px;
+
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.walkthrough-keys {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+
+  margin-top: 12px;
+}
+
+.walkthrough-keys span {
+  width: 28px;
+  height: 28px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 7px;
+
+  background: #f9fafb;
+
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.walkthrough-keys small {
+  margin-left: 4px;
+
+  color: #9ca3af;
+  font-size: 10px;
+}
+
+.walkthrough-exit {
+  width: 100%;
+
+  margin-top: 13px;
+  padding: 9px;
+
+  border: none;
+  border-radius: 9px;
+
+  background: #f3f4f6;
+  color: #374151;
+
+  font-size: 11px;
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .walkthrough-button {
+    left: 12px;
+    bottom: 12px;
+  }
+
+  .walkthrough-help {
+    left: 12px;
+    top: 12px;
+
+    width: 190px;
+  }
+}
