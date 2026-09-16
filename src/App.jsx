@@ -4,7 +4,12 @@ import {
   Environment,
   useGLTF,
 } from "@react-three/drei";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import * as THREE from "three";
 import "./App.css";
 
@@ -31,25 +36,10 @@ function Flat() {
     model.position.y -= box.min.y;
 
     model.traverse((object) => {
-     if (object.isMesh) {
-  object.receiveShadow = true;
-
-  if (
-    object.material &&
-    object.material.name === "Window_Glass"
-  ) {
-    object.castShadow = false;
-    object.receiveShadow = false;
-
-    object.material = object.material.clone();
-    object.material.transparent = true;
-    object.material.opacity = 0.12;
-    object.material.depthWrite = false;
-    object.material.side = THREE.DoubleSide;
-  } else {
-    object.castShadow = true;
-  }
-}
+      if (object.isMesh) {
+        object.castShadow = true;
+        object.receiveShadow = true;
+      }
     });
   }, [model]);
 
@@ -98,7 +88,11 @@ function SunLight({ sunValue }) {
 
   return (
     <directionalLight
-      position={[sunX, sunY, sunZ]}
+      position={[
+        sunX,
+        sunY,
+        sunZ,
+      ]}
       color={sunColor}
       intensity={intensity}
       castShadow
@@ -130,8 +124,7 @@ function CameraSetup({
     if (walkthrough) return;
 
     /*
-     * If we have a saved walkthrough camera,
-     * resume from that exact location.
+     * Resume from the last walkthrough position.
      */
     if (savedCamera) {
       camera.position.copy(
@@ -141,6 +134,8 @@ function CameraSetup({
       camera.rotation.copy(
         savedCamera.rotation
       );
+
+      camera.rotation.order = "YXZ";
 
       if (controlsRef.current) {
         controlsRef.current.target.copy(
@@ -154,7 +149,7 @@ function CameraSetup({
     }
 
     /*
-     * Initial exterior camera.
+     * First exterior view.
      */
     camera.position.set(
       10,
@@ -183,7 +178,9 @@ function CameraSetup({
     savedCamera,
   ]);
 
-  if (walkthrough) return null;
+  if (walkthrough) {
+    return null;
+  }
 
   return (
     <OrbitControls
@@ -229,19 +226,16 @@ function WalkthroughControls({
     right: false,
   });
 
-  /* -----------------------------------------
-     Enter walkthrough
-  ----------------------------------------- */
+  /* -------------------------------------------------------
+     ENTER WALKTHROUGH
+  ------------------------------------------------------- */
 
   useEffect(() => {
     if (!active) return;
 
     /*
-     * IMPORTANT:
-     * If returning from Orbit mode using a saved
-     * walkthrough position, use that position.
-     *
-     * Otherwise use a default interior position.
+     * Resume saved position if available.
+     * Otherwise start at the default entrance.
      */
     if (savedCamera) {
       camera.position.copy(
@@ -267,6 +261,10 @@ function WalkthroughControls({
 
     camera.rotation.order = "YXZ";
 
+    /*
+     * IMPORTANT:
+     * Clear every movement key when entering.
+     */
     keys.current.forward = false;
     keys.current.backward = false;
     keys.current.left = false;
@@ -277,14 +275,33 @@ function WalkthroughControls({
     savedCamera,
   ]);
 
-  /* -----------------------------------------
-     Keyboard movement
-  ----------------------------------------- */
+  /* -------------------------------------------------------
+     KEYBOARD
+  ------------------------------------------------------- */
 
   useEffect(() => {
     if (!active) return;
 
     const handleKeyDown = (event) => {
+      /*
+       * Don't let browser scrolling or other
+       * keyboard behavior interfere.
+       */
+      if (
+        [
+          "KeyW",
+          "KeyA",
+          "KeyS",
+          "KeyD",
+          "ArrowUp",
+          "ArrowDown",
+          "ArrowLeft",
+          "ArrowRight",
+        ].includes(event.code)
+      ) {
+        event.preventDefault();
+      }
+
       switch (event.code) {
         case "KeyW":
         case "ArrowUp":
@@ -293,7 +310,7 @@ function WalkthroughControls({
 
         case "KeyS":
         case "ArrowDown":
-          keys.current.backward = false;
+          keys.current.backward = true;
           break;
 
         case "KeyA":
@@ -320,6 +337,9 @@ function WalkthroughControls({
 
         case "KeyS":
         case "ArrowDown":
+          /*
+           * THIS IS THE IMPORTANT FIX.
+           */
           keys.current.backward = false;
           break;
 
@@ -338,6 +358,19 @@ function WalkthroughControls({
       }
     };
 
+    /*
+     * If browser/window loses focus while a key
+     * is pressed, reset everything.
+     *
+     * This prevents S/W/A/D getting stuck.
+     */
+    const clearKeys = () => {
+      keys.current.forward = false;
+      keys.current.backward = false;
+      keys.current.left = false;
+      keys.current.right = false;
+    };
+
     window.addEventListener(
       "keydown",
       handleKeyDown
@@ -346,6 +379,16 @@ function WalkthroughControls({
     window.addEventListener(
       "keyup",
       handleKeyUp
+    );
+
+    window.addEventListener(
+      "blur",
+      clearKeys
+    );
+
+    document.addEventListener(
+      "visibilitychange",
+      clearKeys
     );
 
     return () => {
@@ -358,12 +401,22 @@ function WalkthroughControls({
         "keyup",
         handleKeyUp
       );
+
+      window.removeEventListener(
+        "blur",
+        clearKeys
+      );
+
+      document.removeEventListener(
+        "visibilitychange",
+        clearKeys
+      );
     };
   }, [active]);
 
-  /* -----------------------------------------
-     Pointer lock
-  ----------------------------------------- */
+  /* -------------------------------------------------------
+     POINTER LOCK
+  ------------------------------------------------------- */
 
   useEffect(() => {
     if (!active) return;
@@ -387,9 +440,9 @@ function WalkthroughControls({
     };
   }, [active, gl]);
 
-  /* -----------------------------------------
-     Mouse look
-  ----------------------------------------- */
+  /* -------------------------------------------------------
+     MOUSE LOOK
+  ------------------------------------------------------- */
 
   useEffect(() => {
     if (!active) return;
@@ -436,23 +489,35 @@ function WalkthroughControls({
         handleMouseMove
       );
     };
-  }, [active, camera, gl]);
+  }, [
+    active,
+    camera,
+    gl,
+  ]);
 
-  /* -----------------------------------------
-     Movement loop
-  ----------------------------------------- */
+  /* -------------------------------------------------------
+     MOVEMENT
+  ------------------------------------------------------- */
 
   useEffect(() => {
     if (!active) return;
 
     let animationFrame;
 
+    /*
+     * Reusable movement vector.
+     */
+    const movement =
+      new THREE.Vector3();
+
     const move = () => {
       const speed = 0.06;
 
-      const movement =
-        new THREE.Vector3();
+      movement.set(0, 0, 0);
 
+      /*
+       * Forward / backward.
+       */
       if (keys.current.forward) {
         movement.z -= 1;
       }
@@ -461,6 +526,9 @@ function WalkthroughControls({
         movement.z += 1;
       }
 
+      /*
+       * Left / right.
+       */
       if (keys.current.left) {
         movement.x -= 1;
       }
@@ -469,32 +537,46 @@ function WalkthroughControls({
         movement.x += 1;
       }
 
-      if (movement.length() > 0) {
+      if (movement.lengthSq() > 0) {
         movement.normalize();
 
-        movement.multiplyScalar(
-          speed
-        );
-
         /*
-         * Move relative to where
-         * the player is looking.
+         * Use only horizontal camera direction.
+         *
+         * This prevents looking downward/upward
+         * from making the player fly or sink.
          */
-        movement.applyQuaternion(
-          camera.quaternion
-        );
+        const yaw =
+          camera.rotation.y;
+
+        const forwardX =
+          -Math.sin(yaw);
+
+        const forwardZ =
+          -Math.cos(yaw);
+
+        const rightX =
+          Math.cos(yaw);
+
+        const rightZ =
+          -Math.sin(yaw);
+
+        const moveX =
+          forwardX * movement.z +
+          rightX * movement.x;
+
+        const moveZ =
+          forwardZ * movement.z +
+          rightZ * movement.x;
+
+        camera.position.x +=
+          moveX * speed;
+
+        camera.position.z +=
+          moveZ * speed;
 
         /*
-         * No flying.
-         */
-        movement.y = 0;
-
-        camera.position.add(
-          movement
-        );
-
-        /*
-         * Fixed eye height.
+         * Fixed human eye height.
          */
         camera.position.y = 1.65;
       }
@@ -510,17 +592,35 @@ function WalkthroughControls({
         animationFrame
       );
     };
-  }, [active, camera]);
+  }, [
+    active,
+    camera,
+  ]);
 
-  /* -----------------------------------------
-     Save current camera
-  ----------------------------------------- */
+  /* -------------------------------------------------------
+     SAVE CAMERA
+  ------------------------------------------------------- */
 
   useEffect(() => {
     if (!active) return;
 
     const saveCurrentCamera =
       () => {
+        const target =
+          new THREE.Vector3(
+            0,
+            0,
+            -1
+          );
+
+        target.applyQuaternion(
+          camera.quaternion
+        );
+
+        target.add(
+          camera.position
+        );
+
         onCameraSave({
           position:
             camera.position.clone(),
@@ -528,22 +628,7 @@ function WalkthroughControls({
           rotation:
             camera.rotation.clone(),
 
-          /*
-           * Orbit target slightly in
-           * front of the player.
-           */
-          target:
-            camera.position
-              .clone()
-              .add(
-                new THREE.Vector3(
-                  0,
-                  0,
-                  -1
-                ).applyQuaternion(
-                  camera.quaternion
-                )
-              ),
+          target,
         });
       };
 
@@ -571,8 +656,10 @@ function LightingPanel({
   setSunValue,
   onClose,
 }) {
-  const [advancedOpen, setAdvancedOpen] =
-    useState(false);
+  const [
+    advancedOpen,
+    setAdvancedOpen,
+  ] = useState(false);
 
   const activePreset =
     sunValue < 0.34
@@ -772,20 +859,30 @@ export default function App() {
   const [sunValue, setSunValue] =
     useState(0.5);
 
-  const [lightingOpen, setLightingOpen] =
-    useState(false);
+  const [
+    lightingOpen,
+    setLightingOpen,
+  ] = useState(false);
 
-  const [walkthrough, setWalkthrough] =
-    useState(false);
+  const [
+    walkthrough,
+    setWalkthrough,
+  ] = useState(false);
 
-  const [savedCamera, setSavedCamera] =
-    useState(null);
+  const [
+    savedCamera,
+    setSavedCamera,
+  ] = useState(null);
+
+  /* -------------------------------------------------------
+     EXIT WALKTHROUGH
+  ------------------------------------------------------- */
 
   const handleExitWalkthrough =
     () => {
       /*
-       * Save exact current position
-       * before switching to Orbit.
+       * Save exact current location
+       * and viewing direction first.
        */
       if (
         window.__saveWalkthroughCamera
@@ -793,6 +890,9 @@ export default function App() {
         window.__saveWalkthroughCamera();
       }
 
+      /*
+       * Exit only after saving.
+       */
       setWalkthrough(false);
     };
 
@@ -908,12 +1008,13 @@ export default function App() {
 
       {/* =================================================
           LIGHTING PANEL
-          ALSO AVAILABLE IN WALKTHROUGH
       ================================================= */}
 
       {lightingOpen && (
         <LightingPanel
-          sunValue={sunValue}
+          sunValue={
+            sunValue
+          }
           setSunValue={
             setSunValue
           }
