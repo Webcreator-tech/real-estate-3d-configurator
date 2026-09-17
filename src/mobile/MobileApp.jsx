@@ -49,7 +49,9 @@ export default function MobileApp() {
       </header>
 
       {/* Walkthrough Touch Controls (Left Joystick + Right Look Surface) */}
-      {mode === "walkthrough" && <MobileTouchControls />}
+      {(mode === "walkthrough" || mode === "customization") && (
+  <MobileTouchControls />
+)}
 
       {/* Compact Customization Drawer Panels */}
       {activePanel === "walls" && (
