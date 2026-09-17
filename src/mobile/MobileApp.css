@@ -93,17 +93,6 @@
   pointer-events: none;
 }
 
-/* Right-half look surface */
-.mobile-look-surface {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 55%;
-  height: 100%;
-  pointer-events: auto;
-  touch-action: none;
-}
-
 /* Left-side virtual joystick zone */
 .mobile-joystick-zone {
   position: absolute;
