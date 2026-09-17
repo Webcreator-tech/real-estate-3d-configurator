@@ -1,11 +1,12 @@
 import React, { useRef, useEffect, useState } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { mobileWalkthroughInput } from "./mobileInput";
+import { mobileWalkthroughInput, TAP_THRESHOLD } from "./mobileInput";
 
 /**
  * 3D Camera Controller for Mobile Walkthrough
  * Must be mounted inside <Canvas>
+ * Distinguishes short tap (object selection) from intentional look drag (camera rotation).
  */
 export function MobileWalkthroughCamera() {
   const { camera } = useThree();
@@ -15,6 +16,9 @@ export function MobileWalkthroughCamera() {
   const playerPos = useRef(new THREE.Vector3(2.4, 1.6, 7.2));
   const yaw = useRef(Math.PI); // Facing inward toward z = 0
   const pitch = useRef(0);
+
+  // Tap/look discrimination state
+  const touchStartPos = useRef({ x: 0, y: 0 });
 
   // Initialize camera position and orientation on mount
   useEffect(() => {
@@ -28,19 +32,29 @@ export function MobileWalkthroughCamera() {
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.1);
 
-    // 1. Process Look Rotation (Yaw & Pitch)
+    // 1. Process Look Rotation (Yaw & Pitch) — only if lookDelta exceeds tap threshold
     const lookSensitivity = 0.0035;
     if (mobileWalkthroughInput.lookDelta.x !== 0 || mobileWalkthroughInput.lookDelta.y !== 0) {
-      yaw.current -= mobileWalkthroughInput.lookDelta.x * lookSensitivity;
-      pitch.current -= mobileWalkthroughInput.lookDelta.y * lookSensitivity;
+      // Check if this exceeds the tap threshold; if not, treat as tap (do not rotate)
+      const dx = mobileWalkthroughInput.lookDelta.x;
+      const dy = mobileWalkthroughInput.lookDelta.y;
+      const movement = Math.hypot(dx, dy);
+      if (movement > TAP_THRESHOLD) {
+        yaw.current -= dx * lookSensitivity;
+        pitch.current -= dy * lookSensitivity;
 
-      // Clamp vertical pitch between -65° and +65°
-      const maxPitch = Math.PI * 0.36;
-      pitch.current = Math.max(-maxPitch, Math.min(maxPitch, pitch.current));
+        // Clamp vertical pitch between -65° and +65°
+        const maxPitch = Math.PI * 0.36;
+        pitch.current = Math.max(-maxPitch, Math.min(maxPitch, pitch.current));
 
-      // Reset look delta after consumption
-      mobileWalkthroughInput.lookDelta.x = 0;
-      mobileWalkthroughInput.lookDelta.y = 0;
+        // Reset look delta after consumption (only for real look drags)
+        mobileWalkthroughInput.lookDelta.x = 0;
+        mobileWalkthroughInput.lookDelta.y = 0;
+      } else {
+        // Movement below threshold: reset to treat as tap, not look drag
+        mobileWalkthroughInput.lookDelta.x = 0;
+        mobileWalkthroughInput.lookDelta.y = 0;
+      }
     }
 
     // 2. Process Horizontal Walking Movement (X-Z plane only)
@@ -160,6 +174,7 @@ export function MobileTouchControls() {
 
     const touch = e.changedTouches[0];
     lookTouchIdRef.current = touch.identifier;
+    // Record starting position for tap/look discrimination
     lastLookPosRef.current = { x: touch.clientX, y: touch.clientY };
     setHasInteracted(true);
   };
@@ -171,8 +186,21 @@ export function MobileTouchControls() {
         const dx = touch.clientX - lastLookPosRef.current.x;
         const dy = touch.clientY - lastLookPosRef.current.y;
 
-        mobileWalkthroughInput.lookDelta.x += dx;
-        mobileWalkthroughInput.lookDelta.y += dy;
+        const movement = Math.hypot(dx, dy);
+
+        if (movement > TAP_THRESHOLD) {
+          // Intentional look drag: accumulate lookDelta
+          mobileWalkthroughInput.lookDelta.x += dx;
+          mobileWalkthroughInput.lookDelta.y += dy;
+          // Stop propagation so tap/selection does not trigger
+          e.stopPropagation();
+        } else {
+          // Below threshold: treat as tap, do not accumulate lookDelta
+          // Do NOT stop propagation - allow tap to reach 3D scene for object selection
+          // Reset accumulated delta so a subsequent drag starts fresh
+          mobileWalkthroughInput.lookDelta.x = 0;
+          mobileWalkthroughInput.lookDelta.y = 0;
+        }
 
         lastLookPosRef.current = { x: touch.clientX, y: touch.clientY };
         break;
@@ -184,6 +212,9 @@ export function MobileTouchControls() {
     for (let i = 0; i < e.changedTouches.length; i++) {
       if (e.changedTouches[i].identifier === lookTouchIdRef.current) {
         lookTouchIdRef.current = null;
+        // Reset look delta on touch end
+        mobileWalkthroughInput.lookDelta.x = 0;
+        mobileWalkthroughInput.lookDelta.y = 0;
         break;
       }
     }
