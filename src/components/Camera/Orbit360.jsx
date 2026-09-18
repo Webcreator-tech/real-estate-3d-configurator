@@ -15,7 +15,7 @@ export default function Orbit360({ onInteraction }) {
 
   useEffect(() => {
     // Position camera for a cinematic exterior overview of the house
-    camera.position.set(11, 7.5, 11);
+    camera.position.set(15, 9, 15);
     camera.lookAt(0, 1.6, 0);
     if (controlsRef.current) {
       controlsRef.current.target.set(0, 1.6, 0);
