@@ -1,3 +1,4 @@
+```jsx
 import React from "react";
 import { useCustomization } from "../../state/customization";
 
@@ -20,14 +21,17 @@ export default function CustomizationToolbar() {
 
   const handleModeToggle = () => {
     if (mode === "walkthrough" || mode === "customization") {
-      // Enter customization / orbit mode.
       setMode("customization");
       return;
     }
 
-    // Return to first-person walkthrough.
     setActivePanel(null);
     setMode("walkthrough");
+  };
+
+  const enter360 = () => {
+    setActivePanel(null);
+    setMode("orbit360");
   };
 
   return (
@@ -36,6 +40,7 @@ export default function CustomizationToolbar() {
       aria-label="Customization toolbar"
     >
       <div className="toolbar-container">
+
         {/* 1. Walls */}
         <button
           className={`toolbar-btn ${
@@ -131,7 +136,40 @@ export default function CustomizationToolbar() {
           <span className="toolbar-label">Lighting</span>
         </button>
 
-        {/* 4. Customization / Walkthrough */}
+        {/* 4. 360° Aerial */}
+        <button
+          className={`toolbar-btn ${
+            mode === "orbit360" ? "active orbit-active" : ""
+          }`}
+          onClick={enter360}
+          title="Enter 360° Aerial View"
+        >
+          <span className="toolbar-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <ellipse
+                cx="12"
+                cy="12"
+                rx="9"
+                ry="3.5"
+              />
+              <path d="M3 12h18" />
+              <path d="M12 3c2.2 2.5 3.3 5.5 3.3 9s-1.1 6.5-3.3 9" />
+              <path d="M12 3c-2.2 2.5-3.3 5.5-3.3 9s1.1 6.5 3.3 9" />
+            </svg>
+          </span>
+
+          <span className="toolbar-label">360°</span>
+        </button>
+
+        {/* 5. Customization / Walkthrough */}
         <button
           className={`toolbar-btn mode-switch ${
             mode === "customization"
@@ -188,7 +226,7 @@ export default function CustomizationToolbar() {
           </span>
         </button>
 
-        {/* 5. Reset */}
+        {/* 6. Reset */}
         <button
           className="toolbar-btn reset-btn"
           onClick={() => setResetModalOpen(true)}
@@ -210,7 +248,9 @@ export default function CustomizationToolbar() {
 
           <span className="toolbar-label">Reset</span>
         </button>
+
       </div>
     </nav>
   );
 }
+```
