@@ -1,4 +1,4 @@
-```jsx
+
 import React from "react";
 import { useCustomization } from "../../state/customization";
 
@@ -253,4 +253,3 @@ export default function CustomizationToolbar() {
     </nav>
   );
 }
-```
