@@ -209,15 +209,25 @@ export function MobileTouchControls() {
       );
     };
 
-    const handleTouchStart = (e) => {
-      // Joystick owns its own touch.
-      if (isJoystickTouch(e.target)) return;
+    const isUiTouch = (target) => {
+  if (!target || !target.closest) return false;
 
-      // Only one look finger.
-      if (lookTouchIdRef.current !== null) return;
+  return Boolean(
+    target.closest(
+      ".customization-panel, .customization-toolbar, .mobile-header, .modal-backdrop"
+    )
+  );
+};
 
-      // Don't treat pinch/multi-touch as camera look.
-      if (e.touches.length > 1) return;
+const handleTouchStart = (e) => {
+  // Joystick and UI panels own their own touches.
+  if (isJoystickTouch(e.target) || isUiTouch(e.target)) return;
+
+  // Only one look finger.
+  if (lookTouchIdRef.current !== null) return;
+
+  // Don't treat pinch/multi-touch as camera look.
+  if (e.touches.length > 1) return;
 
       const touch = e.changedTouches[0];
 
