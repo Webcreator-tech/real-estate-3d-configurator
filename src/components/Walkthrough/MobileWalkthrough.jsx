@@ -246,8 +246,14 @@ const handleTouchStart = (e) => {
     };
 
     const handleTouchMove = (e) => {
-      if (lookTouchIdRef.current === null) return;
+  // Two-finger gestures must never become POV look.
+  if (e.touches.length > 1) {
+    mobileWalkthroughInput.lookDelta.x = 0;
+    mobileWalkthroughInput.lookDelta.y = 0;
+    return;
+  }
 
+  if (lookTouchIdRef.current === null) return;
       for (const touch of e.changedTouches) {
         if (
           touch.identifier !==
