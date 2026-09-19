@@ -65,6 +65,9 @@ export default function DesktopWalkthrough() {
       document.removeEventListener("pointerlockchange", handlePointerLockChange);
       document.removeEventListener("mousemove", handleMouseMove);
       canvas.removeEventListener("click", handleClick);
+      if (document.pointerLockElement === canvas) {
+        document.exitPointerLock?.();
+      }
     };
   }, [gl]);
 

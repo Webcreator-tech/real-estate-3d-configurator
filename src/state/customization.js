@@ -185,28 +185,33 @@ export function CustomizationProvider({ children, initialMode = "walkthrough" })
   // Furniture actions
   const addFurniture = useCallback((type, customPos = null) => {
     const catalogItem = FURNITURE_CATALOG.find((item) => item.type === type) || FURNITURE_CATALOG[0];
-    
-    // Spawn in a reasonable location inside the living/entrance area
-    const defaultPosition = customPos || [
-      (Math.random() - 0.5) * 2 + 1.5,
-      0,
-      (Math.random() - 0.5) * 2 + 1.5,
-    ];
+    const newItemId = "furn_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
 
-    const newItem = {
-      id: "furn_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
-      type: catalogItem.type,
-      name: catalogItem.name,
-      position: defaultPosition,
-      rotation: [0, 0, 0],
-      scale: [...catalogItem.defaultScale],
-      color: catalogItem.defaultColor,
-    };
+    setFurniture((prev) => {
+      const index = prev.length;
+      // Deterministic layout offset inside the living area
+      const defaultPosition = customPos || [
+        1.2 + (index % 3) * 0.7 - 0.7,
+        0,
+        1.2 + Math.floor(index / 3) * 0.7 - 0.7,
+      ];
 
-    setFurniture((prev) => [...prev, newItem]);
-    setSelectedFurnitureId(newItem.id);
+      const newItem = {
+        id: newItemId,
+        type: catalogItem.type,
+        name: catalogItem.name,
+        position: defaultPosition,
+        rotation: [0, 0, 0],
+        scale: [...catalogItem.defaultScale],
+        color: catalogItem.defaultColor,
+      };
+
+      return [...prev, newItem];
+    });
+
+    setSelectedFurnitureId(newItemId);
     setActivePanel("furniture");
-    return newItem.id;
+    return newItemId;
   }, []);
 
   const selectFurniture = useCallback((id) => {
@@ -240,6 +245,7 @@ export function CustomizationProvider({ children, initialMode = "walkthrough" })
   const resetCustomization = useCallback(() => {
     setWallColors({});
     setSelectedWall(null);
+    setWallFinish("matte");
     setFurniture([]);
     setSelectedFurnitureId(null);
     setLightingPreset("afternoon");

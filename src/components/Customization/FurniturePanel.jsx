@@ -25,6 +25,17 @@ export default function FurniturePanel({ onClose }) {
   } = useCustomization();
 
   const [activeTab, setActiveTab] = useState(selectedFurniture ? "edit" : "add");
+  const [prevSelectedId, setPrevSelectedId] = useState(selectedFurnitureId);
+
+  // Synchronize active tab during render when selection changes
+  if (prevSelectedId !== selectedFurnitureId) {
+    setPrevSelectedId(selectedFurnitureId);
+    if (selectedFurnitureId) {
+      setActiveTab("edit");
+    } else if (activeTab === "edit") {
+      setActiveTab("add");
+    }
+  }
 
   const handleAddItem = (type) => {
     addFurniture(type);

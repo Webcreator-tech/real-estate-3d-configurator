@@ -15,9 +15,9 @@ import "./MobileApp.css";
 export default function MobileApp() {
   const { mode, setMode, activePanel, setActivePanel } = useCustomization();
 
-  // Ensure mobile directly enters Walkthrough mode on load
+  // Ensure mobile enters Walkthrough mode if loaded in desktop orbit mode
   useEffect(() => {
-    if (mode !== "walkthrough" && mode !== "orbit360") {
+    if (mode === "orbit") {
       setMode("walkthrough");
     }
   }, [mode, setMode]);

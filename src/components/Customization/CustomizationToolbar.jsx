@@ -20,13 +20,12 @@ export default function CustomizationToolbar() {
   };
 
   const handleModeToggle = () => {
-    if (mode === "walkthrough" || mode === "customization") {
+    if (mode === "customization") {
+      setActivePanel(null);
+      setMode("walkthrough");
+    } else {
       setMode("customization");
-      return;
     }
-
-    setActivePanel(null);
-    setMode("walkthrough");
   };
 
   const enter360 = () => {

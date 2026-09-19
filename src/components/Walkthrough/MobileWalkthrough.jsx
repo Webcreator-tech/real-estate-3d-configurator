@@ -65,19 +65,15 @@ export function MobileWalkthroughCamera() {
     const dy = mobileWalkthroughInput.lookDelta.y;
 
     if (dx !== 0 || dy !== 0) {
-      const movement = Math.hypot(dx, dy);
+      yaw.current -= dx * lookSensitivity;
+      pitch.current -= dy * lookSensitivity;
 
-      if (movement > TAP_THRESHOLD) {
-        yaw.current -= dx * lookSensitivity;
-        pitch.current -= dy * lookSensitivity;
+      const maxPitch = Math.PI * 0.36;
 
-        const maxPitch = Math.PI * 0.36;
-
-        pitch.current = Math.max(
-          -maxPitch,
-          Math.min(maxPitch, pitch.current)
-        );
-      }
+      pitch.current = Math.max(
+        -maxPitch,
+        Math.min(maxPitch, pitch.current)
+      );
 
       mobileWalkthroughInput.lookDelta.x = 0;
       mobileWalkthroughInput.lookDelta.y = 0;
@@ -188,12 +184,14 @@ export function MobileTouchControls() {
   const touchIdRef = useRef(null);
 
   const lookTouchIdRef = useRef(null);
-
+  const lookStartPosRef = useRef({
+    x: 0,
+    y: 0,
+  });
   const lastLookPosRef = useRef({
     x: 0,
     y: 0,
   });
-
   const lookStartedRef = useRef(false);
 
   // ------------------------------------------------------------
@@ -210,79 +208,74 @@ export function MobileTouchControls() {
     };
 
     const isUiTouch = (target) => {
-  if (!target || !target.closest) return false;
+      if (!target || !target.closest) return false;
 
-  return Boolean(
-    target.closest(
-      ".customization-panel, .customization-toolbar, .mobile-header, .modal-backdrop"
-    )
-  );
-};
+      return Boolean(
+        target.closest(
+          ".customization-panel, .customization-toolbar, .mobile-header, .modal-backdrop"
+        )
+      );
+    };
 
-const handleTouchStart = (e) => {
-  // Joystick and UI panels own their own touches.
-  if (isJoystickTouch(e.target) || isUiTouch(e.target)) return;
+    const handleTouchStart = (e) => {
+      // Joystick and UI panels own their own touches.
+      if (isJoystickTouch(e.target) || isUiTouch(e.target)) return;
 
-  // Only one look finger.
-  if (lookTouchIdRef.current !== null) return;
-
-  // Don't treat pinch/multi-touch as camera look.
-  if (e.touches.length > 1) return;
+      // Only one look finger at a time.
+      if (lookTouchIdRef.current !== null) return;
 
       const touch = e.changedTouches[0];
-
       if (!touch) return;
 
       lookTouchIdRef.current = touch.identifier;
-
+      lookStartPosRef.current = {
+        x: touch.clientX,
+        y: touch.clientY,
+      };
       lastLookPosRef.current = {
         x: touch.clientX,
         y: touch.clientY,
       };
-
       lookStartedRef.current = false;
-
       setHasInteracted(true);
     };
 
     const handleTouchMove = (e) => {
-  // Two-finger gestures must never become POV look.
-  if (e.touches.length > 1) {
-    mobileWalkthroughInput.lookDelta.x = 0;
-    mobileWalkthroughInput.lookDelta.y = 0;
-    return;
-  }
+      if (lookTouchIdRef.current === null) return;
 
-  if (lookTouchIdRef.current === null) return;
       for (const touch of e.changedTouches) {
-        if (
-          touch.identifier !==
-          lookTouchIdRef.current
-        ) {
+        if (touch.identifier !== lookTouchIdRef.current) {
           continue;
         }
 
-        const dx =
-          touch.clientX -
-          lastLookPosRef.current.x;
+        // Check if movement from initial touch exceeds tap threshold
+        if (!lookStartedRef.current) {
+          const totalDist = Math.hypot(
+            touch.clientX - lookStartPosRef.current.x,
+            touch.clientY - lookStartPosRef.current.y
+          );
 
-        const dy =
-          touch.clientY -
-          lastLookPosRef.current.y;
+          if (totalDist > TAP_THRESHOLD) {
+            lookStartedRef.current = true;
+            lastLookPosRef.current = {
+              x: touch.clientX,
+              y: touch.clientY,
+            };
+          }
+        }
 
-        const movement = Math.hypot(dx, dy);
-
-        if (movement > TAP_THRESHOLD) {
-          lookStartedRef.current = true;
+        if (lookStartedRef.current) {
+          const dx = touch.clientX - lastLookPosRef.current.x;
+          const dy = touch.clientY - lastLookPosRef.current.y;
 
           mobileWalkthroughInput.lookDelta.x += dx;
           mobileWalkthroughInput.lookDelta.y += dy;
-        }
 
-        lastLookPosRef.current = {
-          x: touch.clientX,
-          y: touch.clientY,
-        };
+          lastLookPosRef.current = {
+            x: touch.clientX,
+            y: touch.clientY,
+          };
+        }
 
         break;
       }
@@ -290,25 +283,22 @@ const handleTouchStart = (e) => {
 
     const handleTouchEnd = (e) => {
       for (const touch of e.changedTouches) {
-        if (
-          touch.identifier !==
-          lookTouchIdRef.current
-        ) {
+        if (touch.identifier !== lookTouchIdRef.current) {
           continue;
         }
 
         lookTouchIdRef.current = null;
-
         lastLookPosRef.current = {
           x: 0,
           y: 0,
         };
-
+        lookStartPosRef.current = {
+          x: 0,
+          y: 0,
+        };
         lookStartedRef.current = false;
-
         mobileWalkthroughInput.lookDelta.x = 0;
         mobileWalkthroughInput.lookDelta.y = 0;
-
         break;
       }
     };
