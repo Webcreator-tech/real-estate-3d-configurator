@@ -8,16 +8,11 @@ import { TAP_THRESHOLD } from "../Walkthrough/mobileInput";
  * Procedural 3D Furniture Items
  * Provides clean, lightweight, realistic placeholders until custom GLTF assets are supplied.
  */
-// Double-click detection threshold in ms (matches browser default).
-const DBL_CLICK_MS = 250;
-
 function FurnitureItem({ item, isSelected, onSelect }) {
   const { position, rotation, scale, color, type } = item;
 
   const pointerStart = useRef({ x: 0, y: 0 });
   const dragged = useRef(false);
-  // Timer ref for deferred single-click selection.
-  const clickTimer = useRef(null);
 
   const handlePointerDown = (e) => {
     e.stopPropagation();
@@ -45,20 +40,7 @@ function FurnitureItem({ item, isSelected, onSelect }) {
     // A camera-look drag must never select furniture.
     if (dragged.current) return;
 
-    // Defer single-click selection so a double-click can cancel it.
-    // If a second click arrives within DBL_CLICK_MS, the timer is cleared
-    // and the canvas dblclick handler activates direction-decider instead.
-    if (clickTimer.current !== null) {
-      // Second click within threshold → double-click, cancel selection.
-      clearTimeout(clickTimer.current);
-      clickTimer.current = null;
-      return;
-    }
-
-    clickTimer.current = setTimeout(() => {
-      clickTimer.current = null;
-      onSelect(item.id);
-    }, DBL_CLICK_MS);
+    onSelect(item.id);
   };
 
   return (
@@ -631,9 +613,6 @@ export default function Flat() {
     return null;
   };
 
-  // Timer ref for deferred wall single-click selection.
-  const wallClickTimer = useRef(null);
-
   const handlePointerDown = (e) => {
     const wall = findWallMesh(e.object);
 
@@ -679,23 +658,7 @@ export default function Flat() {
 
     e.stopPropagation();
 
-    const wallName = wall.name;
-
-    // Defer single-click selection so a double-click can cancel it.
-    // If a second pointerup on a wall arrives within DBL_CLICK_MS,
-    // the timer is cleared and direction-decider activates instead.
-    if (wallClickTimer.current !== null) {
-      // Second tap within threshold → double-click, cancel selection.
-      clearTimeout(wallClickTimer.current);
-      wallClickTimer.current = null;
-      wallPointerMoved.current = false;
-      return;
-    }
-
-    wallClickTimer.current = setTimeout(() => {
-      wallClickTimer.current = null;
-      selectWall(wallName);
-    }, DBL_CLICK_MS);
+    selectWall(wall.name);
 
     wallPointerMoved.current = false;
   };
