@@ -71,8 +71,10 @@ export default function DesktopWalkthrough() {
       pitch.current = Math.max(-maxPitch, Math.min(maxPitch, pitch.current));
     };
 
-    const handleClick = () => {
-      // Do not trap mouse in pointer lock when interacting with UI panels
+    // Direction-decider activates on DOUBLE-CLICK in the viewport (not single-click).
+    // Single-click continues to work normally for wall/furniture/scene interactions.
+    const handleDblClick = () => {
+      // Do not activate when interacting with UI panels or modals
       if (activePanel || resetModalOpen) return;
 
       if (!isLocked.current) {
@@ -82,12 +84,12 @@ export default function DesktopWalkthrough() {
 
     document.addEventListener("pointerlockchange", handlePointerLockChange);
     document.addEventListener("mousemove", handleMouseMove);
-    canvas.addEventListener("click", handleClick);
+    canvas.addEventListener("dblclick", handleDblClick);
 
     return () => {
       document.removeEventListener("pointerlockchange", handlePointerLockChange);
       document.removeEventListener("mousemove", handleMouseMove);
-      canvas.removeEventListener("click", handleClick);
+      canvas.removeEventListener("dblclick", handleDblClick);
       if (document.pointerLockElement === canvas) {
         document.exitPointerLock?.();
       }

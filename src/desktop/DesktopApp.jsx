@@ -69,7 +69,7 @@ export default function DesktopApp() {
             Move: <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or Arrow Keys
           </span>
           <span>•</span>
-          <span>Click canvas to look with mouse (<kbd>ESC</kbd> to exit)</span>
+          <span>Double-click canvas to look with mouse (<kbd>ESC</kbd> to exit)</span>
         </div>
       )}
 
