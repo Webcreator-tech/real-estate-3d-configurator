@@ -51,6 +51,9 @@ export default function DesktopWalkthrough() {
     }
   }, [activePanel, resetModalOpen, gl]);
 
+  // Tracks the timestamp of the last pointerdown for manual double-click detection.
+  const lastPointerDown = useRef(0);
+
   // Pointer lock & mouse event listeners
   useEffect(() => {
     const canvas = gl.domElement;
@@ -71,25 +74,44 @@ export default function DesktopWalkthrough() {
       pitch.current = Math.max(-maxPitch, Math.min(maxPitch, pitch.current));
     };
 
-    // Direction-decider activates on DOUBLE-CLICK in the viewport (not single-click).
-    // Single-click continues to work normally for wall/furniture/scene interactions.
-    const handleDblClick = () => {
+    // Manual double-click detector via pointerdown timing.
+    //
+    // Why not 'dblclick'? R3F calls setPointerCapture on pointerdown over 3D
+    // geometry, which can prevent the browser from synthesising 'dblclick' on
+    // the canvas for those positions (walls, furniture, floor).
+    //
+    // 'pointerdown' on the canvas element itself always fires regardless of
+    // what 3D object is hit, and stopPropagation inside R3F only stops
+    // bubbling to parent elements — it cannot suppress sibling listeners on
+    // the same canvas node. So this fires reliably over the entire viewport.
+    const DBL_CLICK_MS = 300;
+
+    const handlePointerDown = (e) => {
+      // Primary button only (left click)
+      if (e.button !== 0) return;
       // Do not activate when interacting with UI panels or modals
       if (activePanel || resetModalOpen) return;
 
-      if (!isLocked.current) {
-        canvas.requestPointerLock?.();
+      const now = Date.now();
+      if (now - lastPointerDown.current <= DBL_CLICK_MS) {
+        // Second press within threshold → double-click detected.
+        lastPointerDown.current = 0; // reset so a third press doesn't re-fire
+        if (!isLocked.current) {
+          canvas.requestPointerLock?.();
+        }
+      } else {
+        lastPointerDown.current = now;
       }
     };
 
     document.addEventListener("pointerlockchange", handlePointerLockChange);
     document.addEventListener("mousemove", handleMouseMove);
-    canvas.addEventListener("dblclick", handleDblClick);
+    canvas.addEventListener("pointerdown", handlePointerDown);
 
     return () => {
       document.removeEventListener("pointerlockchange", handlePointerLockChange);
       document.removeEventListener("mousemove", handleMouseMove);
-      canvas.removeEventListener("dblclick", handleDblClick);
+      canvas.removeEventListener("pointerdown", handlePointerDown);
       if (document.pointerLockElement === canvas) {
         document.exitPointerLock?.();
       }
