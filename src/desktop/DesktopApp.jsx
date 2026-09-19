@@ -48,7 +48,7 @@ export default function DesktopApp() {
             <span>Orbit Overview</span>
           </button>
           <button
-            className={`mode-pill-btn ${mode === "walkthrough" ? "active" : ""}`}
+            className={`mode-pill-btn ${mode === "walkthrough" || mode === "customization" ? "active" : ""}`}
             onClick={() => setMode("walkthrough")}
           >
             <span>First-Person Walkthrough</span>
@@ -63,7 +63,7 @@ export default function DesktopApp() {
       </header>
 
       {/* Desktop Walkthrough Instruction Hint */}
-      {mode === "walkthrough" && (
+      {(mode === "walkthrough" || mode === "customization") && (
         <div className="desktop-controls-banner">
           <span>
             Move: <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or Arrow Keys

@@ -1,9 +1,11 @@
 import React, { useRef, useEffect } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { useCustomization } from "../../state/customization";
 
 export default function DesktopWalkthrough() {
   const { camera, gl } = useThree();
+  const { mode, activePanel, resetModalOpen } = useCustomization();
 
   const keysPressed = useRef({
     w: false,
@@ -22,14 +24,32 @@ export default function DesktopWalkthrough() {
   const pitch = useRef(0);
   const playerPos = useRef(new THREE.Vector3(2.4, 1.6, 7.2));
 
-  // Initialize camera position near the main entrance
+  // Initialize camera position near the entrance (walkthrough) or interior (customization)
   useEffect(() => {
-    playerPos.current.set(2.4, 1.6, 7.2);
+    const isCustomization = mode === "customization";
+    if (isCustomization) {
+      playerPos.current.set(0, 1.6, 2.0);
+    } else {
+      playerPos.current.set(2.4, 1.6, 7.2);
+    }
     yaw.current = Math.PI;
     pitch.current = 0;
     camera.position.copy(playerPos.current);
     camera.rotation.set(0, Math.PI, 0, "YXZ");
-  }, [camera]);
+    if ("fov" in camera) {
+      Object.assign(camera, { fov: 60 });
+      camera.updateProjectionMatrix();
+    }
+  }, [camera, mode]);
+
+  // Automatically release pointer lock when a panel or modal is open
+  useEffect(() => {
+    if (activePanel || resetModalOpen) {
+      if (document.pointerLockElement === gl.domElement) {
+        document.exitPointerLock?.();
+      }
+    }
+  }, [activePanel, resetModalOpen, gl]);
 
   // Pointer lock & mouse event listeners
   useEffect(() => {
@@ -52,6 +72,9 @@ export default function DesktopWalkthrough() {
     };
 
     const handleClick = () => {
+      // Do not trap mouse in pointer lock when interacting with UI panels
+      if (activePanel || resetModalOpen) return;
+
       if (!isLocked.current) {
         canvas.requestPointerLock?.();
       }
@@ -69,11 +92,16 @@ export default function DesktopWalkthrough() {
         document.exitPointerLock?.();
       }
     };
-  }, [gl]);
+  }, [gl, activePanel, resetModalOpen]);
 
   // Keyboard event listeners
   useEffect(() => {
     const handleKeyDown = (e) => {
+      const target = e.target;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+
       const key = e.key.toLowerCase();
       if (keysPressed.current[key] !== undefined) {
         keysPressed.current[key] = true;
@@ -93,12 +121,21 @@ export default function DesktopWalkthrough() {
       }
     };
 
+    // Prevent keys getting stuck on window blur / tab switch
+    const handleBlur = () => {
+      Object.keys(keysPressed.current).forEach((k) => {
+        keysPressed.current[k] = false;
+      });
+    };
+
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleBlur);
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleBlur);
     };
   }, []);
 
@@ -137,8 +174,13 @@ export default function DesktopWalkthrough() {
         playerPos.current.z += dz;
 
         // Clamp inside property boundary
-        playerPos.current.x = Math.max(-4.1, Math.min(4.1, playerPos.current.x));
-        playerPos.current.z = Math.max(-5.9, Math.min(7.6, playerPos.current.z));
+        if (mode === "customization") {
+          playerPos.current.x = THREE.MathUtils.clamp(playerPos.current.x, -3.7, 3.7);
+          playerPos.current.z = THREE.MathUtils.clamp(playerPos.current.z, -5.0, 5.0);
+        } else {
+          playerPos.current.x = THREE.MathUtils.clamp(playerPos.current.x, -4.1, 4.1);
+          playerPos.current.z = THREE.MathUtils.clamp(playerPos.current.z, -5.9, 7.6);
+        }
       }
     }
 

@@ -171,6 +171,8 @@ export function CustomizationProvider({ children, initialMode = "walkthrough" })
       const preset = LIGHTING_PRESETS[presetId];
       setAdvancedLighting((prev) => ({
         ...prev,
+        sunElevation: 45,
+        sunAzimuth: 45,
         sunIntensity: preset.sunIntensity,
         ambientIntensity: preset.ambientIntensity,
         sunColor: preset.sunColor,
