@@ -104,19 +104,28 @@ export default function DesktopWalkthrough() {
       }
     };
 
+    const handleDoubleClick = (e) => {
+      // Activate pointer lock on double-click anywhere on canvas
+      if (activePanel || resetModalOpen) return;
+      if (!isLocked.current) {
+        canvas.requestPointerLock?.();
+      }
+    };
+
     document.addEventListener("pointerlockchange", handlePointerLockChange);
     document.addEventListener("mousemove", handleMouseMove);
     canvas.addEventListener("pointerdown", handlePointerDown);
++    canvas.addEventListener("dblclick", handleDoubleClick);
 
     return () => {
       document.removeEventListener("pointerlockchange", handlePointerLockChange);
       document.removeEventListener("mousemove", handleMouseMove);
       canvas.removeEventListener("pointerdown", handlePointerDown);
++      canvas.removeEventListener("dblclick", handleDoubleClick);
       if (document.pointerLockElement === canvas) {
         document.exitPointerLock?.();
       }
-    };
-  }, [gl, activePanel, resetModalOpen]);
+    };  }, [gl, activePanel, resetModalOpen]);
 
   // Keyboard event listeners
   useEffect(() => {
