@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { useGLTF } from "@react-three/drei";
 import { useCustomization } from "../../state/customization";
 import { TAP_THRESHOLD } from "../Walkthrough/mobileInput";
+import { clickArbiter } from "../../utils/clickArbiter";
 
 /**
  * Procedural 3D Furniture Items
@@ -40,7 +41,8 @@ function FurnitureItem({ item, isSelected, onSelect }) {
     // A camera-look drag must never select furniture.
     if (dragged.current) return;
 
-    onSelect(item.id);
+    // Defer selection so a quick double-click can cancel it via the arbiter.
+    clickArbiter.scheduleWallSelection(() => onSelect(item.id));
   };
 
   return (
@@ -658,7 +660,8 @@ export default function Flat() {
 
     e.stopPropagation();
 
-    selectWall(wall.name);
+    // Defer selection so a quick double-click can cancel it via the arbiter.
+    clickArbiter.scheduleWallSelection(() => selectWall(wall.name));
 
     wallPointerMoved.current = false;
   };

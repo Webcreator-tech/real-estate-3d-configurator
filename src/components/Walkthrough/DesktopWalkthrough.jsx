@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useCustomization } from "../../state/customization";
+import { clickArbiter } from "../../utils/clickArbiter";
 
 export default function DesktopWalkthrough() {
   const { camera, gl } = useThree();
@@ -51,8 +52,7 @@ export default function DesktopWalkthrough() {
     }
   }, [activePanel, resetModalOpen, gl]);
 
-  // Tracks the timestamp of the last pointerdown for manual double-click detection.
-  const lastPointerDown = useRef(0);
+
 
   // Pointer lock & mouse event listeners
   useEffect(() => {
@@ -74,54 +74,48 @@ export default function DesktopWalkthrough() {
       pitch.current = Math.max(-maxPitch, Math.min(maxPitch, pitch.current));
     };
 
-    // Manual double-click detector via pointerdown timing.
+    // Click arbiter: detects double-click via pointerdown timing.
     //
-    // Why not 'dblclick'? R3F calls setPointerCapture on pointerdown over 3D
-    // geometry, which can prevent the browser from synthesising 'dblclick' on
-    // the canvas for those positions (walls, furniture, floor).
+    // Why pointerdown and not 'dblclick'? R3F calls setPointerCapture on
+    // pointerdown over 3D geometry, which can suppress the browser's
+    // synthesised 'dblclick' for those positions (walls, furniture, floor).
     //
-    // 'pointerdown' on the canvas element itself always fires regardless of
-    // what 3D object is hit, and stopPropagation inside R3F only stops
-    // bubbling to parent elements — it cannot suppress sibling listeners on
-    // the same canvas node. So this fires reliably over the entire viewport.
-    const DBL_CLICK_MS = 300;
+    // 'pointerdown' on the canvas element always fires regardless of which
+    // 3D object is hit, and stopPropagation inside R3F only stops bubbling
+    // to parent elements — it cannot suppress sibling listeners on the same
+    // canvas node. So this fires reliably over the entire viewport.
+    //
+    // IMPORTANT: We do NOT guard on activePanel/resetModalOpen here because
+    // the first click may have opened a panel. The arbiter's
+    // scheduleWallSelection defers the panel-opening action; when a
+    // double-click arrives the pending action is cancelled and we activate
+    // the direction-decider instead.
 
     const handlePointerDown = (e) => {
       // Primary button only (left click)
       if (e.button !== 0) return;
-      // Do not activate when interacting with UI panels or modals
-      if (activePanel || resetModalOpen) return;
 
-      const now = Date.now();
-      if (now - lastPointerDown.current <= DBL_CLICK_MS) {
-        // Second press within threshold → double-click detected.
-        lastPointerDown.current = 0; // reset so a third press doesn't re-fire
+      const isDouble = clickArbiter.registerPointerDown();
+      if (isDouble) {
+        // Double-click detected — activate direction-decider.
+        // Cancel any pending single-click action (wall/furniture selection).
+        clickArbiter.cancelPendingSelection();
+
         if (!isLocked.current) {
           canvas.requestPointerLock?.();
         }
-      } else {
-        lastPointerDown.current = now;
-      }
-    };
-
-    const handleDoubleClick = (e) => {
-      // Activate pointer lock on double-click anywhere on canvas
-      if (activePanel || resetModalOpen) return;
-      if (!isLocked.current) {
-        canvas.requestPointerLock?.();
       }
     };
 
     document.addEventListener("pointerlockchange", handlePointerLockChange);
     document.addEventListener("mousemove", handleMouseMove);
     canvas.addEventListener("pointerdown", handlePointerDown);
-+    canvas.addEventListener("dblclick", handleDoubleClick);
 
     return () => {
       document.removeEventListener("pointerlockchange", handlePointerLockChange);
       document.removeEventListener("mousemove", handleMouseMove);
       canvas.removeEventListener("pointerdown", handlePointerDown);
-+      canvas.removeEventListener("dblclick", handleDoubleClick);
+      clickArbiter.cancelPendingSelection();
       if (document.pointerLockElement === canvas) {
         document.exitPointerLock?.();
       }
