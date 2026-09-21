@@ -616,7 +616,11 @@ export default function Flat() {
   };
 
   const handlePointerDown = (e) => {
-    const wall = findWallMesh(e.object);
+    // Only the front-most intersection determines what was actually clicked.
+    // If the top hit is a ceiling, roof, or other non-wall surface, do not track wall tap.
+    const frontHit = e.intersections?.[0];
+    const frontObject = frontHit ? frontHit.object : e.object;
+    const wall = findWallMesh(frontObject);
 
     if (!wall) return;
 
@@ -629,10 +633,6 @@ export default function Flat() {
   };
 
   const handlePointerMove = (e) => {
-    const wall = findWallMesh(e.object);
-
-    if (!wall) return;
-
     const dx =
       e.clientX -
       wallPointerStart.current.x;
@@ -650,7 +650,11 @@ export default function Flat() {
   };
 
   const handlePointerUp = (e) => {
-    const wall = findWallMesh(e.object);
+    // Determine clicked object strictly from the front-most intersection under the pointer.
+    // If the front-most hit is a ceiling/top surface, a wall behind it will NOT be selected.
+    const frontHit = e.intersections?.[0];
+    const frontObject = frontHit ? frontHit.object : e.object;
+    const wall = findWallMesh(frontObject);
 
     if (!wall) return;
 

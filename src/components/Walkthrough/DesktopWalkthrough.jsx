@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useLayoutEffect } from "react";
 import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useCustomization } from "../../state/customization";
@@ -21,22 +21,29 @@ export default function DesktopWalkthrough() {
 
   const isLocked = useRef(false);
 
-  const yaw = useRef(Math.PI);
+  const yaw = useRef(0);
   const pitch = useRef(0);
-  const playerPos = useRef(new THREE.Vector3(2.4, 1.6, 7.2));
+  const playerPos = useRef(
+    new THREE.Vector3(
+      mode === "customization" ? 0 : 2.4,
+      1.6,
+      mode === "customization" ? 2.0 : 7.2
+    )
+  );
 
   // Initialize camera position near the entrance (walkthrough) or interior (customization)
-  useEffect(() => {
-    const isCustomization = mode === "customization";
-    if (isCustomization) {
-      playerPos.current.set(0, 1.6, 2.0);
-    } else {
+  // useLayoutEffect ensures it runs synchronously before paint/useFrame, preventing any 1-frame rotation lag
+  useLayoutEffect(() => {
+    if (mode === "walkthrough") {
       playerPos.current.set(2.4, 1.6, 7.2);
+      yaw.current = 0; // Face toward the house / main door (along -Z)
+    } else if (mode === "customization") {
+      playerPos.current.set(0, 1.6, 2.0);
+      yaw.current = 0; // Face toward the interior (along -Z)
     }
-    yaw.current = Math.PI;
     pitch.current = 0;
     camera.position.copy(playerPos.current);
-    camera.rotation.set(0, Math.PI, 0, "YXZ");
+    camera.rotation.set(0, yaw.current, 0, "YXZ");
     if ("fov" in camera) {
       Object.assign(camera, { fov: 60 });
       camera.updateProjectionMatrix();
