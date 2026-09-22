@@ -147,6 +147,7 @@ export function CustomizationProvider({ children, initialMode = "walkthrough" })
   const selectWall = useCallback((wallName) => {
     setSelectedWall(wallName);
     if (wallName) {
+      setSelectedFurnitureId(null);
       setActivePanel("walls");
     }
   }, []);
@@ -215,6 +216,7 @@ export function CustomizationProvider({ children, initialMode = "walkthrough" })
     });
 
     setSelectedFurnitureId(newItemId);
+    setSelectedWall(null);
     setActivePanel("furniture");
     return newItemId;
   }, []);
@@ -222,6 +224,7 @@ export function CustomizationProvider({ children, initialMode = "walkthrough" })
   const selectFurniture = useCallback((id) => {
     setSelectedFurnitureId(id);
     if (id) {
+      setSelectedWall(null);
       setActivePanel("furniture");
     }
   }, []);

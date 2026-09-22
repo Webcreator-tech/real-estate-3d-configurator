@@ -130,6 +130,8 @@ export default function DesktopWalkthrough() {
 
   // Keyboard event listeners
   useEffect(() => {
+    const keys = keysPressed.current;
+
     const handleKeyDown = (e) => {
       const target = e.target;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
@@ -137,28 +139,28 @@ export default function DesktopWalkthrough() {
       }
 
       const key = e.key.toLowerCase();
-      if (keysPressed.current[key] !== undefined) {
-        keysPressed.current[key] = true;
+      if (keys[key] !== undefined) {
+        keys[key] = true;
       }
-      if (keysPressed.current[e.key] !== undefined) {
-        keysPressed.current[e.key] = true;
+      if (keys[e.key] !== undefined) {
+        keys[e.key] = true;
       }
     };
 
     const handleKeyUp = (e) => {
       const key = e.key.toLowerCase();
-      if (keysPressed.current[key] !== undefined) {
-        keysPressed.current[key] = false;
+      if (keys[key] !== undefined) {
+        keys[key] = false;
       }
-      if (keysPressed.current[e.key] !== undefined) {
-        keysPressed.current[e.key] = false;
+      if (keys[e.key] !== undefined) {
+        keys[e.key] = false;
       }
     };
 
     // Prevent keys getting stuck on window blur / tab switch
     const handleBlur = () => {
-      Object.keys(keysPressed.current).forEach((k) => {
-        keysPressed.current[k] = false;
+      Object.keys(keys).forEach((k) => {
+        keys[k] = false;
       });
     };
 
@@ -170,6 +172,9 @@ export default function DesktopWalkthrough() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleBlur);
+      Object.keys(keys).forEach((k) => {
+        keys[k] = false;
+      });
     };
   }, []);
 

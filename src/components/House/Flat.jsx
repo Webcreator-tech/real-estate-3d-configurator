@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect, useRef } from "react";
 import * as THREE from "three";
+import { useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { useCustomization } from "../../state/customization";
 import { TAP_THRESHOLD } from "../Walkthrough/mobileInput";
@@ -9,7 +10,7 @@ import { clickArbiter } from "../../utils/clickArbiter";
  * Procedural 3D Furniture Items
  * Provides clean, lightweight, realistic placeholders until custom GLTF assets are supplied.
  */
-function FurnitureItem({ item, isSelected, onSelect }) {
+function FurnitureItem({ item, isSelected, onSelect, onActivity }) {
   const { position, rotation, scale, color, type } = item;
 
   const pointerStart = useRef({ x: 0, y: 0 });
@@ -17,6 +18,7 @@ function FurnitureItem({ item, isSelected, onSelect }) {
 
   const handlePointerDown = (e) => {
     e.stopPropagation();
+    onActivity?.();
 
     pointerStart.current = {
       x: e.clientX,
@@ -37,6 +39,7 @@ function FurnitureItem({ item, isSelected, onSelect }) {
 
   const handleClick = (e) => {
     e.stopPropagation();
+    onActivity?.();
 
     // A camera-look drag must never select furniture.
     if (dragged.current) return;
@@ -465,6 +468,7 @@ function FurnitureItem({ item, isSelected, onSelect }) {
  */
 export default function Flat() {
   const { scene } = useGLTF("/models/flat.glb");
+  const { gl } = useThree();
 
   const {
     wallColors,
@@ -514,6 +518,30 @@ export default function Flat() {
       originalMaterials: origMap,
     };
   }, [scene]);
+
+  // Safely dispose cloned materials when clonedScene is discarded or component unmounts.
+  // Never disposes shared GLTF assets cached by useGLTF / Drei.
+  useEffect(() => {
+    return () => {
+      clonedScene.traverse((child) => {
+        if (child.isMesh && child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach((m) => m.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+      });
+      originalMaterials.forEach((mat) => {
+        if (Array.isArray(mat)) {
+          mat.forEach((m) => m.dispose());
+        } else {
+          mat.dispose();
+        }
+      });
+      originalMaterials.clear();
+    };
+  }, [clonedScene, originalMaterials]);
 
   // Apply wall customization.
   useEffect(() => {
@@ -565,17 +593,19 @@ export default function Flat() {
           originalMat.metalness;
       }
 
-      // Selection highlight.
+      // Keep emissive clean and black - do NOT contaminate wall paint with emissive!
+      child.material.emissive.set(0x000000);
+      child.material.emissiveIntensity = 0;
+
+      // Polygon offset for the selected wall to prevent z-fighting with the outline overlay
       if (selectedWall === child.name) {
-        child.material.emissive =
-          new THREE.Color("#38bdf8");
-
-        child.material.emissiveIntensity = 0.25;
+        child.material.polygonOffset = true;
+        child.material.polygonOffsetFactor = 1;
+        child.material.polygonOffsetUnits = 1;
       } else {
-        child.material.emissive =
-          new THREE.Color(0x000000);
-
-        child.material.emissiveIntensity = 0;
+        child.material.polygonOffset = false;
+        child.material.polygonOffsetFactor = 0;
+        child.material.polygonOffsetUnits = 0;
       }
 
       child.material.needsUpdate = true;
@@ -588,6 +618,45 @@ export default function Flat() {
     wallFinish,
   ]);
 
+  // Separate wall selection outline indicator (EdgesGeometry + LineSegments)
+  // Keeps wall paint completely unaltered while clearly indicating selection.
+  useEffect(() => {
+    if (!selectedWall || !clonedScene) return;
+
+    let targetMesh = null;
+    clonedScene.traverse((child) => {
+      if (child.isMesh && child.name === selectedWall) {
+        targetMesh = child;
+      }
+    });
+
+    if (!targetMesh || !targetMesh.geometry) return;
+
+    // Create edge geometry from target mesh geometry (crease angle 24 deg)
+    const edgesGeometry = new THREE.EdgesGeometry(targetMesh.geometry, 24);
+    const lineMaterial = new THREE.LineBasicMaterial({
+      color: new THREE.Color("#38bdf8"),
+      transparent: true,
+      opacity: 0.95,
+      depthTest: true,
+      depthWrite: false,
+    });
+
+    const highlightLine = new THREE.LineSegments(edgesGeometry, lineMaterial);
+    highlightLine.name = "__wall_selection_highlight__";
+    highlightLine.renderOrder = 999;
+    // Ensure raycaster completely ignores the highlight overlay
+    highlightLine.raycast = () => {};
+
+    targetMesh.add(highlightLine);
+
+    return () => {
+      targetMesh.remove(highlightLine);
+      edgesGeometry.dispose();
+      lineMaterial.dispose();
+    };
+  }, [selectedWall, clonedScene]);
+
   // Apply ceiling visibility.
   useEffect(() => {
     clonedScene.traverse((child) => {
@@ -599,8 +668,10 @@ export default function Flat() {
   }, [clonedScene, ceilingVisible]);
 
   // ------------------------------------------------------------
-  // WALL TAP / DRAG DISCRIMINATION
+  // SELECTION & TAP / DRAG DISCRIMINATION
   // ------------------------------------------------------------
+
+  const r3fHandledRef = useRef(false);
 
   const wallPointerStart = useRef({
     x: 0,
@@ -627,23 +698,13 @@ export default function Flat() {
   };
 
   const handlePointerDown = (e) => {
-    // Always reset stale drag state first, regardless of what surface is hit.
+    r3fHandledRef.current = true;
     wallPointerMoved.current = false;
-
-    // Only the front-most intersection determines what was actually clicked.
-    // If the top hit is a ceiling, roof, or other non-wall surface, do not track wall tap.
-    const frontHit = e.intersections?.[0];
-    const frontObject = frontHit ? frontHit.object : e.object;
-    const wall = findWallMesh(frontObject);
-
-    if (!wall) return;
 
     wallPointerStart.current = {
       x: e.clientX,
       y: e.clientY,
     };
-
-    wallPointerMoved.current = false;
   };
 
   const handlePointerMove = (e) => {
@@ -664,25 +725,78 @@ export default function Flat() {
   };
 
   const handlePointerUp = (e) => {
+    r3fHandledRef.current = true;
+
+    if (wallPointerMoved.current) {
+      return;
+    }
+
     // Determine clicked object strictly from the front-most intersection under the pointer.
     // If the front-most hit is a ceiling/top surface, a wall behind it will NOT be selected.
     const frontHit = e.intersections?.[0];
     const frontObject = frontHit ? frontHit.object : e.object;
     const wall = findWallMesh(frontObject);
 
-    if (!wall) return;
-
-    if (wallPointerMoved.current) {
-      return;
-    }
-
     e.stopPropagation();
 
-    // Defer selection so a quick double-click can cancel it via the arbiter.
-    clickArbiter.scheduleWallSelection(() => selectWall(wall.name));
+    if (wall) {
+      // Tap on visible wall -> select wall, deselect furniture
+      clickArbiter.scheduleWallSelection(() => selectWall(wall.name));
+    } else {
+      // Tap on empty floor, ceiling, or other non-wall 3D surface -> deselect wall and furniture
+      clickArbiter.scheduleWallSelection(() => {
+        selectWall(null);
+        selectFurniture(null);
+      });
+    }
 
     wallPointerMoved.current = false;
   };
+
+  // Empty canvas tap handler (clicks in empty sky/space outside the house)
+  useEffect(() => {
+    const canvas = gl.domElement;
+    let canvasPointerStart = { x: 0, y: 0 };
+
+    const handleCanvasPointerDown = (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      r3fHandledRef.current = false;
+      canvasPointerStart = { x: e.clientX, y: e.clientY };
+    };
+
+    const handleCanvasPointerUp = (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+
+      const dist = Math.hypot(
+        e.clientX - canvasPointerStart.x,
+        e.clientY - canvasPointerStart.y
+      );
+
+      // Drag/swipe gestures (camera look) must never trigger deselection
+      if (dist > TAP_THRESHOLD) {
+        return;
+      }
+
+      // Allow any R3F hit handler to run first (dispatched synchronously in pointer event cycle)
+      setTimeout(() => {
+        if (!r3fHandledRef.current) {
+          // Empty canvas tapped -> deselect both wall and furniture
+          clickArbiter.scheduleWallSelection(() => {
+            selectWall(null);
+            selectFurniture(null);
+          });
+        }
+      }, 0);
+    };
+
+    canvas.addEventListener("pointerdown", handleCanvasPointerDown);
+    canvas.addEventListener("pointerup", handleCanvasPointerUp);
+
+    return () => {
+      canvas.removeEventListener("pointerdown", handleCanvasPointerDown);
+      canvas.removeEventListener("pointerup", handleCanvasPointerUp);
+    };
+  }, [gl, selectWall, selectFurniture]);
 
   return (
     <group
@@ -701,6 +815,9 @@ export default function Flat() {
             selectedFurnitureId === item.id
           }
           onSelect={selectFurniture}
+          onActivity={() => {
+            r3fHandledRef.current = true;
+          }}
         />
       ))}
     </group>

@@ -330,23 +330,32 @@ export function MobileTouchControls() {
     return () => {
       window.removeEventListener(
         "touchstart",
-        handleTouchStart
+        handleTouchStart,
+        { passive: true }
       );
 
       window.removeEventListener(
         "touchmove",
-        handleTouchMove
+        handleTouchMove,
+        { passive: true }
       );
 
       window.removeEventListener(
         "touchend",
-        handleTouchEnd
+        handleTouchEnd,
+        { passive: true }
       );
 
       window.removeEventListener(
         "touchcancel",
-        handleTouchEnd
+        handleTouchEnd,
+        { passive: true }
       );
+
+      mobileWalkthroughInput.move.x = 0;
+      mobileWalkthroughInput.move.y = 0;
+      mobileWalkthroughInput.lookDelta.x = 0;
+      mobileWalkthroughInput.lookDelta.y = 0;
     };
   }, []);
 
