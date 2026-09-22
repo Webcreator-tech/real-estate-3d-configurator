@@ -11,6 +11,8 @@ export default function CustomizationToolbar() {
     setResetModalOpen,
     furniture,
     selectedWall,
+    ceilingVisible,
+    setCeilingVisible,
   } = useCustomization();
 
   const togglePanel = (panelName) => {
@@ -135,7 +137,37 @@ export default function CustomizationToolbar() {
           <span className="toolbar-label">Lighting</span>
         </button>
 
-        {/* 4. 360° Aerial */}
+        {/* 4. Ceiling toggle */}
+        <button
+          className={`toolbar-btn ${
+            !ceilingVisible ? "active orbit-active" : ""
+          }`}
+          onClick={() => setCeilingVisible((v) => !v)}
+          title={ceilingVisible ? "Hide Ceiling" : "Show Ceiling"}
+        >
+          <span className="toolbar-icon">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+              {!ceilingVisible && (
+                <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" strokeWidth="2" />
+              )}
+            </svg>
+          </span>
+
+          <span className="toolbar-label">
+            Ceiling {ceilingVisible ? "ON" : "OFF"}
+          </span>
+        </button>
+
+        {/* 5. 360° Aerial */}
         <button
           className={`toolbar-btn ${
             mode === "orbit360" ? "active orbit-active" : ""

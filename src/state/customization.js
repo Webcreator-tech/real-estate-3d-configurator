@@ -135,6 +135,9 @@ export function CustomizationProvider({ children, initialMode = "walkthrough" })
   // Reset confirmation modal state
   const [resetModalOpen, setResetModalOpen] = useState(false);
 
+  // Ceiling visibility: true = visible (default), false = hidden
+  const [ceilingVisible, setCeilingVisible] = useState(true);
+
   // Mode switching (Preserves all customizations!)
   const switchMode = useCallback((newMode) => {
     setMode(newMode);
@@ -260,6 +263,7 @@ export function CustomizationProvider({ children, initialMode = "walkthrough" })
     });
     setActivePanel(null);
     setResetModalOpen(false);
+    setCeilingVisible(true);
   }, []);
 
   // Active lighting configuration derived from preset + overrides
@@ -319,6 +323,10 @@ export function CustomizationProvider({ children, initialMode = "walkthrough" })
     resetModalOpen,
     setResetModalOpen,
     resetCustomization,
+
+    // Ceiling visibility
+    ceilingVisible,
+    setCeilingVisible,
   };
 
   return React.createElement(CustomizationContext.Provider, { value }, children);

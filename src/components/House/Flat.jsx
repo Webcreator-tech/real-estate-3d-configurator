@@ -474,6 +474,7 @@ export default function Flat() {
     furniture,
     selectedFurnitureId,
     selectFurniture,
+    ceilingVisible,
   } = useCustomization();
 
   // Clone scene once to avoid mutating cached GLTF.
@@ -587,6 +588,16 @@ export default function Flat() {
     wallFinish,
   ]);
 
+  // Apply ceiling visibility.
+  useEffect(() => {
+    clonedScene.traverse((child) => {
+      // The ceiling mesh is named "Ceiling_Main" in the GLB node graph.
+      if (child.name === "Ceiling_Main") {
+        child.visible = ceilingVisible;
+      }
+    });
+  }, [clonedScene, ceilingVisible]);
+
   // ------------------------------------------------------------
   // WALL TAP / DRAG DISCRIMINATION
   // ------------------------------------------------------------
@@ -616,6 +627,9 @@ export default function Flat() {
   };
 
   const handlePointerDown = (e) => {
+    // Always reset stale drag state first, regardless of what surface is hit.
+    wallPointerMoved.current = false;
+
     // Only the front-most intersection determines what was actually clicked.
     // If the top hit is a ceiling, roof, or other non-wall surface, do not track wall tap.
     const frontHit = e.intersections?.[0];
